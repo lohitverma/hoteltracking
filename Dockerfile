@@ -4,7 +4,12 @@ FROM python:3.11-slim as builder
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1 \
-    PYTHONPATH=/app:/app/backend
+    PYTHONPATH=/app:/app/backend \
+    VIRTUAL_ENV=/opt/venv
+
+# Create virtual environment
+RUN python -m venv $VIRTUAL_ENV
+ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -12,11 +17,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Set working directory
+# Create non-root user
+RUN useradd -m appuser
+
+# Set working directory and change ownership
 WORKDIR /app
+COPY --chown=appuser:appuser requirements.txt .
+
+# Switch to non-root user
+USER appuser
 
 # Install dependencies
-COPY requirements.txt .
 RUN pip wheel --no-deps --no-cache-dir --wheel-dir /app/wheels -r requirements.txt
 
 # Final stage
@@ -28,24 +39,31 @@ ENV PYTHONUNBUFFERED=1 \
     PORT=10000 \
     ENVIRONMENT=production \
     DEBUG=false \
-    ALLOWED_HOSTS=".onrender.com"
+    ALLOWED_HOSTS=".onrender.com" \
+    VIRTUAL_ENV=/opt/venv
+
+# Create virtual environment
+RUN python -m venv $VIRTUAL_ENV
+ENV PATH="$VIRTUAL_ENV/bin:$PATH"
+
+# Create non-root user
+RUN useradd -m appuser
 
 WORKDIR /app
 
-# Copy wheels from builder
-COPY --from=builder /app/wheels /app/wheels
-COPY --from=builder /app/requirements.txt .
+# Copy wheels and requirements from builder
+COPY --from=builder --chown=appuser:appuser /app/wheels /app/wheels
+COPY --from=builder --chown=appuser:appuser /app/requirements.txt .
+
+# Switch to non-root user
+USER appuser
 
 # Install dependencies
 RUN pip install --no-cache-dir --no-index --find-links=/app/wheels -r requirements.txt \
     && rm -rf /app/wheels
 
 # Copy application code
-COPY . .
-
-# Create non-root user
-RUN useradd -m appuser && chown -R appuser:appuser /app
-USER appuser
+COPY --chown=appuser:appuser . .
 
 # Create start script with health check
 RUN echo '#!/bin/bash\n\
