@@ -3,7 +3,10 @@ FROM python:3.11-slim
 # Set environment variables
 ENV PYTHONUNBUFFERED=1 \
     PYTHONPATH=/app:/app/backend \
-    PORT=10000
+    PORT=10000 \
+    ENVIRONMENT=production \
+    DEBUG=false \
+    ALLOWED_HOSTS=".onrender.com"
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -26,7 +29,7 @@ RUN useradd -m appuser && chown -R appuser:appuser /app
 USER appuser
 
 # Expose port
-EXPOSE 10000
+EXPOSE $PORT
 
-# Default command using PORT environment variable
-CMD ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "$PORT"]
+# Default command
+CMD uvicorn backend.main:app --host 0.0.0.0 --port $PORT --workers 4

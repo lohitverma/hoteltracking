@@ -6,12 +6,14 @@ services:
     envVars:
       - key: PORT
         value: 10000
-      - key: POSTGRES_USER
-        sync: false
-      - key: POSTGRES_PASSWORD
-        sync: false
-      - key: POSTGRES_DB
-        value: hotel_tracker
+      - key: ENVIRONMENT
+        value: production
+      - key: DEBUG
+        value: false
+      - key: ALLOWED_HOSTS
+        value: .onrender.com
+      - key: SECRET_KEY
+        generateValue: true
       - key: DATABASE_URL
         fromDatabase:
           name: hotel-tracker-db
@@ -21,14 +23,6 @@ services:
           name: hotel-tracker-redis
           type: redis
           property: connectionString
-      - key: SECRET_KEY
-        generateValue: true
-      - key: ENVIRONMENT
-        value: production
-      - key: DEBUG
-        value: false
-      - key: ALLOWED_HOSTS
-        value: .onrender.com
     healthCheckPath: /health
     autoDeploy: true
 
@@ -37,6 +31,8 @@ services:
     env: docker
     dockerfilePath: ./Dockerfile
     envVars:
+      - key: ENVIRONMENT
+        value: production
       - key: DATABASE_URL
         fromDatabase:
           name: hotel-tracker-db
@@ -51,8 +47,8 @@ services:
 databases:
   - name: hotel-tracker-db
     databaseName: hotel_tracker
-    user: hotel_tracker
     plan: starter
+    ipAllowList: [] # allow all
 
 redis:
   - name: hotel-tracker-redis
