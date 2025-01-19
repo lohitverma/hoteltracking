@@ -37,9 +37,17 @@ USER appuser
 # Upgrade pip and install wheel
 RUN pip install --upgrade pip setuptools wheel
 
-# Install dependencies
-RUN pip wheel --no-deps --no-cache-dir --wheel-dir /app/wheels -r requirements.txt && \
-    pip wheel --no-deps --no-cache-dir --wheel-dir /app/wheels anyio==3.7.1
+# Install core dependencies first
+RUN pip wheel --no-deps --no-cache-dir --wheel-dir /app/wheels \
+    anyio==3.7.1 \
+    starlette==0.27.0 \
+    typing-extensions==4.8.0 \
+    idna==3.4 \
+    sniffio==1.3.0 \
+    pydantic-core==2.14.5
+
+# Install remaining dependencies
+RUN pip wheel --no-deps --no-cache-dir --wheel-dir /app/wheels -r requirements.txt
 
 # Final stage
 FROM python:3.11-slim
@@ -79,9 +87,17 @@ USER appuser
 # Upgrade pip
 RUN pip install --upgrade pip
 
-# Install dependencies
-RUN pip install --no-cache-dir anyio==3.7.1 && \
-    pip install --no-cache-dir --no-index --find-links=/app/wheels -r requirements.txt && \
+# Install core dependencies first
+RUN pip install --no-cache-dir \
+    anyio==3.7.1 \
+    starlette==0.27.0 \
+    typing-extensions==4.8.0 \
+    idna==3.4 \
+    sniffio==1.3.0 \
+    pydantic-core==2.14.5
+
+# Install remaining dependencies
+RUN pip install --no-cache-dir --no-index --find-links=/app/wheels -r requirements.txt && \
     rm -rf /app/wheels
 
 # Copy application code
