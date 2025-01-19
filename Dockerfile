@@ -38,19 +38,16 @@ RUN pip install --upgrade pip setuptools wheel && \
 # Final stage
 FROM python:3.11-slim
 
+# Set environment variables
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONPATH=/app:/app/backend \
-    PORT=8000 \
-    ENVIRONMENT=production \
-    DEBUG=false \
-    ALLOWED_HOSTS=".onrender.com" \
+    PORT=10000 \
     VIRTUAL_ENV=/opt/venv
 
 # Install runtime dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq5 \
-    netcat-traditional \
     && rm -rf /var/lib/apt/lists/*
 
 # Create virtual environment
@@ -72,10 +69,6 @@ USER appuser
 RUN chmod +x start.sh
 
 # Expose the port
-EXPOSE 8000
+EXPOSE ${PORT}
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:${PORT:-8000}/health || exit 1
-
-CMD ["./start.sh"]
+CMD uvicorn backend.main:app --host 0.0.0.0 --port ${PORT} --workers 4
