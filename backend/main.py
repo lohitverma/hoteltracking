@@ -218,6 +218,10 @@ async def get_hotel_details(
     finally:
         await aggregator.close()
 
+@app.get("/health")
+async def health_check():
+    return {"status": "healthy"}
+
 app.include_router(analytics_router)
 app.include_router(city_router)
 
