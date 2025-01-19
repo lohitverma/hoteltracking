@@ -15,6 +15,8 @@ ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     curl \
+    libpq-dev \
+    python3-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Create non-root user
@@ -31,6 +33,9 @@ RUN chown appuser:appuser /app/requirements.txt
 # Switch to non-root user
 USER appuser
 
+# Upgrade pip and install wheel
+RUN pip install --upgrade pip wheel setuptools
+
 # Install dependencies
 RUN pip wheel --no-deps --no-cache-dir --wheel-dir /app/wheels -r requirements.txt
 
@@ -45,6 +50,11 @@ ENV PYTHONUNBUFFERED=1 \
     DEBUG=false \
     ALLOWED_HOSTS=".onrender.com" \
     VIRTUAL_ENV=/opt/venv
+
+# Install runtime dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libpq5 \
+    && rm -rf /var/lib/apt/lists/*
 
 # Create virtual environment
 RUN python -m venv $VIRTUAL_ENV
@@ -63,6 +73,9 @@ COPY --from=builder --chown=appuser:appuser /app/requirements.txt .
 
 # Switch to non-root user
 USER appuser
+
+# Upgrade pip
+RUN pip install --upgrade pip
 
 # Install dependencies
 RUN pip install --no-cache-dir --no-index --find-links=/app/wheels -r requirements.txt \
