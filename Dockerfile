@@ -31,5 +31,9 @@ USER appuser
 # Expose port
 EXPOSE $PORT
 
+# Create start script
+RUN echo '#!/bin/bash\nuvicorn backend.main:app --host 0.0.0.0 --port "${PORT:-10000}" --workers 4' > start.sh && \
+    chmod +x start.sh
+
 # Default command
-CMD uvicorn backend.main:app --host 0.0.0.0 --port $PORT --workers 4
+CMD ["./start.sh"]

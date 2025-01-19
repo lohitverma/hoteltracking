@@ -4,8 +4,6 @@ services:
     env: docker
     dockerfilePath: ./Dockerfile
     envVars:
-      - key: PORT
-        value: 10000
       - key: ENVIRONMENT
         value: production
       - key: DEBUG
