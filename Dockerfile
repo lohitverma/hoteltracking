@@ -41,7 +41,7 @@ FROM python:3.11-slim
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONPATH=/app:/app/backend \
-    PORT=10000 \
+    PORT=8000 \
     ENVIRONMENT=production \
     DEBUG=false \
     ALLOWED_HOSTS=".onrender.com" \
@@ -50,6 +50,7 @@ ENV PYTHONUNBUFFERED=1 \
 # Install runtime dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq5 \
+    netcat-traditional \
     && rm -rf /var/lib/apt/lists/*
 
 # Create virtual environment
@@ -70,5 +71,11 @@ USER appuser
 # Make start script executable
 RUN chmod +x start.sh
 
-EXPOSE $PORT
+# Expose the port
+EXPOSE 8000
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:${PORT:-8000}/health || exit 1
+
 CMD ["./start.sh"]

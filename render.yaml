@@ -3,7 +3,11 @@ services:
     name: hotel-tracker-web
     env: docker
     dockerfilePath: ./Dockerfile
+    region: ohio
+    plan: starter
     envVars:
+      - key: PORT
+        value: 8000
       - key: ENVIRONMENT
         value: production
       - key: DEBUG
@@ -27,6 +31,8 @@ services:
         value: "1"
     healthCheckPath: /health
     autoDeploy: true
+    buildCommand: docker build -t hotel-tracker .
+    startCommand: docker run -p 8000:8000 -e PORT=8000 hotel-tracker
 
   - type: worker
     name: hotel-tracker-celery
