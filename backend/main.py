@@ -1,17 +1,17 @@
-from fastapi import FastAPI, HTTPException, Depends, Request, Response
+from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel
 from typing import List, Optional, Dict
 from datetime import datetime
+import logging
+import json
 import os
+import time
 from dotenv import load_dotenv
-from services.aggregator import HotelAggregator
-from services.location_service import LocationService
-from database import get_db
-from sqlalchemy.orm import Session
-from models import User, Hotel, PriceAlert
+import database
+import cache
 import logging
 from hotel_apis.analytics_routes import router as analytics_router
 from hotel_apis.city_routes import router as city_router
@@ -37,7 +37,7 @@ app = FastAPI(
     
     1. Use the `/api/cities` endpoint to search for cities
     2. Use `/api/hotels/search` to find hotels in your chosen city
-    3. Set up price alerts using `/api/alerts/create`
+    3. Track prices using `/api/hotels/{hotel_id}/prices`
     """,
     version="1.0.0",
     docs_url="/api/docs",
@@ -85,30 +85,12 @@ async def http_exception_handler(request: Request, exc: HTTPException):
         }
     )
 
-# Mount static files
-app.mount("/static", StaticFiles(directory="static"), name="static")
-
-class HotelSearch(BaseModel):
-    location_id: str
-    location_name: str
-    check_in: str
-    check_out: str
-    guests: int = 2
+class SearchParams(BaseModel):
+    city: str
+    checkin: str
+    checkout: str
+    guests: int
     rooms: int = 1
-
-class PriceAlertRequest(BaseModel):
-    hotel_id: str
-    target_price: float
-    alert_type: str  # 'sms', 'email', or 'both'
-
-class LocationResponse(BaseModel):
-    id: str
-    name: str
-    city: Optional[str]
-    country: str
-    state: Optional[str]
-    latitude: Optional[float]
-    longitude: Optional[float]
     timezone: Optional[str]
 
 @app.get("/")
@@ -123,166 +105,74 @@ async def root():
         "version": "1.0.0",
         "docs_url": "/api/docs",
         "status": "operational",
-        "timestamp": datetime.datetime.utcnow().isoformat()
+        "timestamp": datetime.utcnow().isoformat()
     }
 
 @app.get("/api/locations/search")
 async def search_locations(
     query: str,
-    limit: int = 10
-) -> List[LocationResponse]:
-    """Search for cities/locations"""
+    limit: Optional[int] = 10
+):
+    """
+    Search for locations (cities, regions) by name
+    """
     try:
-        location_service = LocationService()
-        locations = await location_service.search_cities(query)
-        await location_service.close()
-        return locations[:limit]
-    except Exception as e:
-        logger.error(f"Location search error: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        # Use cache if available
+        cache_key = f"location_search:{query}:{limit}"
+        cached_result = await cache.get(cache_key)
+        if cached_result:
+            return json.loads(cached_result)
 
-@app.get("/api/locations/popular")
-async def get_popular_locations() -> List[Dict]:
-    """Get list of popular destinations"""
-    try:
-        location_service = LocationService()
-        locations = await location_service.get_popular_destinations()
-        await location_service.close()
-        return locations
+        # Query database
+        result = await database.search_locations(query, limit)
+        
+        # Cache the result
+        await cache.set(cache_key, json.dumps(result), expire=3600)
+        
+        return result
     except Exception as e:
-        logger.error(f"Error getting popular locations: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Error searching locations: {str(e)}")
+        raise HTTPException(status_code=500, detail="Error searching locations")
 
-@app.post("/api/search")
+@app.get("/api/hotels/search")
 async def search_hotels(
-    search: HotelSearch,
-    db: Session = Depends(get_db)
-):
-    try:
-        # Convert string dates to datetime
-        check_in = datetime.strptime(search.check_in, "%Y-%m-%d")
-        check_out = datetime.strptime(search.check_out, "%Y-%m-%d")
-        
-        # Initialize aggregator
-        aggregator = HotelAggregator(db)
-        
-        # Search across all providers
-        hotels = await aggregator.search_all_providers(
-            location_id=search.location_id,
-            location_name=search.location_name,
-            check_in=check_in,
-            check_out=check_out,
-            guests=search.guests,
-            rooms=search.rooms
-        )
-        
-        # Store hotels in database
-        for hotel_data in hotels:
-            hotel = db.query(Hotel).filter(Hotel.hotel_id == hotel_data['hotel_id']).first()
-            if not hotel:
-                hotel = Hotel(
-                    hotel_id=hotel_data['hotel_id'],
-                    name=hotel_data['name'],
-                    location=hotel_data['location'],
-                    rating=hotel_data.get('rating'),
-                    image_url=hotel_data.get('image_url')
-                )
-                db.add(hotel)
-                
-        db.commit()
-        return hotels
-        
-    except Exception as e:
-        logger.error(f"Search error: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        await aggregator.close()
-
-@app.post("/api/alerts")
-async def create_price_alert(
-    alert: PriceAlertRequest,
-    db: Session = Depends(get_db),
-    user_id: int = 1  # Replace with actual user authentication
-):
-    try:
-        hotel = db.query(Hotel).filter(Hotel.hotel_id == alert.hotel_id).first()
-        if not hotel:
-            raise HTTPException(status_code=404, detail="Hotel not found")
-            
-        price_alert = PriceAlert(
-            user_id=user_id,
-            hotel_id=hotel.id,
-            target_price=alert.target_price,
-            alert_type=alert.alert_type
-        )
-        db.add(price_alert)
-        db.commit()
-        
-        return {"message": "Price alert created successfully"}
-        
-    except Exception as e:
-        logger.error(f"Error creating alert: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.get("/api/hotel/{hotel_id}/prices")
-async def get_hotel_prices(
-    hotel_id: str,
-    check_in: str,
-    check_out: str,
+    city: str,
+    checkin: str,
+    checkout: str,
     guests: int = 2,
-    rooms: int = 1,
-    db: Session = Depends(get_db)
+    rooms: int = 1
 ):
+    """
+    Search for hotels in a specific city
+    """
     try:
-        # Convert string dates to datetime
-        check_in_date = datetime.strptime(check_in, "%Y-%m-%d")
-        check_out_date = datetime.strptime(check_out, "%Y-%m-%d")
-        
-        # Initialize aggregator
-        aggregator = HotelAggregator(db)
-        
-        # Get best price across all providers
-        best_price = await aggregator.get_best_price(
-            hotel_id=hotel_id,
-            check_in=check_in_date,
-            check_out=check_out_date,
-            guests=guests,
-            rooms=rooms
-        )
-        
-        if not best_price:
-            raise HTTPException(status_code=404, detail="No prices found")
-            
-        return best_price
-        
-    except Exception as e:
-        logger.error(f"Error getting prices: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        await aggregator.close()
+        # Validate dates
+        try:
+            checkin_date = datetime.strptime(checkin, "%Y-%m-%d")
+            checkout_date = datetime.strptime(checkout, "%Y-%m-%d")
+            if checkout_date <= checkin_date:
+                raise ValueError("Checkout date must be after checkin date")
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
 
-@app.get("/api/hotel/{hotel_id}")
-async def get_hotel_details(
-    hotel_id: str,
-    db: Session = Depends(get_db)
-):
-    try:
-        # Initialize aggregator
-        aggregator = HotelAggregator(db)
+        # Use cache if available
+        cache_key = f"hotel_search:{city}:{checkin}:{checkout}:{guests}:{rooms}"
+        cached_result = await cache.get(cache_key)
+        if cached_result:
+            return json.loads(cached_result)
+
+        # Query database
+        result = await database.search_hotels(city, checkin, checkout, guests, rooms)
         
-        # Get hotel details from first available provider
-        for provider in aggregator.providers.values():
-            details = await provider.get_hotel_details(hotel_id)
-            if details:
-                return details
-                
-        raise HTTPException(status_code=404, detail="Hotel not found")
+        # Cache the result
+        await cache.set(cache_key, json.dumps(result), expire=1800)
         
+        return result
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"Error getting hotel details: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        await aggregator.close()
+        logger.error(f"Error searching hotels: {str(e)}")
+        raise HTTPException(status_code=500, detail="Error searching hotels")
 
 @app.get("/health")
 async def health_check():
@@ -293,7 +183,7 @@ async def health_check():
     """
     status = {
         "status": "healthy",
-        "timestamp": datetime.datetime.utcnow().isoformat(),
+        "timestamp": datetime.utcnow().isoformat(),
         "components": {
             "api": "healthy",
             "database": "unknown",
@@ -331,7 +221,3 @@ async def health_check():
 
 app.include_router(analytics_router)
 app.include_router(city_router)
-
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
