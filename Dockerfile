@@ -25,36 +25,15 @@ RUN useradd -m appuser
 
 # Set working directory and change ownership
 WORKDIR /app
-RUN mkdir -p /app/wheels && chown -R appuser:appuser /app /opt/venv
-
-# Copy requirements and set ownership
-COPY requirements.txt /app/
-RUN chown appuser:appuser /app/requirements.txt
+COPY requirements.txt .
+RUN chown -R appuser:appuser /app /opt/venv
 
 # Switch to non-root user
 USER appuser
 
-# Upgrade pip and install wheel
-RUN pip install --upgrade pip setuptools wheel
-
-# Install dependencies in order
-RUN pip wheel --no-deps --no-cache-dir --wheel-dir /app/wheels \
-    charset-normalizer==3.3.2 \
-    certifi==2023.11.17 \
-    urllib3==2.1.0 \
-    idna==3.4 \
-    requests==2.31.0
-
-RUN pip wheel --no-deps --no-cache-dir --wheel-dir /app/wheels \
-    anyio==3.7.1 \
-    sniffio==1.3.0 \
-    typing-extensions==4.8.0 \
-    starlette==0.27.0 \
-    pydantic-core==2.14.5 \
-    pydantic==2.5.2
-
-# Build remaining wheels
-RUN pip wheel --no-deps --no-cache-dir --wheel-dir /app/wheels -r requirements.txt
+# Upgrade pip and install dependencies
+RUN pip install --upgrade pip setuptools wheel && \
+    pip install --no-cache-dir -r requirements.txt
 
 # Final stage
 FROM python:3.11-slim
@@ -80,40 +59,15 @@ ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 # Create non-root user
 RUN useradd -m appuser
 
-# Set up directories
+# Set up directories and copy files
 WORKDIR /app
-RUN mkdir -p /app/wheels && chown -R appuser:appuser /app /opt/venv
-
-# Copy wheels and requirements from builder
-COPY --from=builder --chown=appuser:appuser /app/wheels /app/wheels
-COPY --from=builder --chown=appuser:appuser /app/requirements.txt .
+COPY --from=builder --chown=appuser:appuser /opt/venv /opt/venv
+COPY --chown=appuser:appuser . .
 
 # Switch to non-root user
 USER appuser
 
-# Upgrade pip
-RUN pip install --upgrade pip
-
-# Install dependencies in correct order
-RUN pip install --no-cache-dir --find-links=/app/wheels \
-    charset-normalizer==3.3.2 \
-    certifi==2023.11.17 \
-    urllib3==2.1.0 \
-    idna==3.4 \
-    requests==2.31.0 \
-    anyio==3.7.1 \
-    sniffio==1.3.0 \
-    typing-extensions==4.8.0 \
-    starlette==0.27.0 \
-    pydantic-core==2.14.5 \
-    pydantic==2.5.2 \
-    && pip install --no-cache-dir --no-index --find-links=/app/wheels -r requirements.txt \
-    && rm -rf /app/wheels
-
-# Copy application code
-COPY --chown=appuser:appuser . .
-
-# Create start script with health check
+# Create start script
 RUN echo '#!/bin/bash\n\
 echo "Starting Hotel Tracker API..."\n\
 echo "Environment: $ENVIRONMENT"\n\
