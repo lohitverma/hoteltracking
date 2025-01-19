@@ -37,16 +37,23 @@ USER appuser
 # Upgrade pip and install wheel
 RUN pip install --upgrade pip setuptools wheel
 
-# Install core dependencies first
+# Install dependencies in order
+RUN pip wheel --no-deps --no-cache-dir --wheel-dir /app/wheels \
+    charset-normalizer==3.3.2 \
+    certifi==2023.11.17 \
+    urllib3==2.1.0 \
+    idna==3.4 \
+    requests==2.31.0
+
 RUN pip wheel --no-deps --no-cache-dir --wheel-dir /app/wheels \
     anyio==3.7.1 \
-    starlette==0.27.0 \
-    typing-extensions==4.8.0 \
-    idna==3.4 \
     sniffio==1.3.0 \
-    pydantic-core==2.14.5
+    typing-extensions==4.8.0 \
+    starlette==0.27.0 \
+    pydantic-core==2.14.5 \
+    pydantic==2.5.2
 
-# Install remaining dependencies
+# Build remaining wheels
 RUN pip wheel --no-deps --no-cache-dir --wheel-dir /app/wheels -r requirements.txt
 
 # Final stage
@@ -87,18 +94,21 @@ USER appuser
 # Upgrade pip
 RUN pip install --upgrade pip
 
-# Install core dependencies first
-RUN pip install --no-cache-dir \
-    anyio==3.7.1 \
-    starlette==0.27.0 \
-    typing-extensions==4.8.0 \
+# Install dependencies in correct order
+RUN pip install --no-cache-dir --find-links=/app/wheels \
+    charset-normalizer==3.3.2 \
+    certifi==2023.11.17 \
+    urllib3==2.1.0 \
     idna==3.4 \
+    requests==2.31.0 \
+    anyio==3.7.1 \
     sniffio==1.3.0 \
-    pydantic-core==2.14.5
-
-# Install remaining dependencies
-RUN pip install --no-cache-dir --no-index --find-links=/app/wheels -r requirements.txt && \
-    rm -rf /app/wheels
+    typing-extensions==4.8.0 \
+    starlette==0.27.0 \
+    pydantic-core==2.14.5 \
+    pydantic==2.5.2 \
+    && pip install --no-cache-dir --no-index --find-links=/app/wheels -r requirements.txt \
+    && rm -rf /app/wheels
 
 # Copy application code
 COPY --chown=appuser:appuser . .
