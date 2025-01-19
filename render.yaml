@@ -1,0 +1,50 @@
+services:
+  - type: web
+    name: hotel-tracker-web
+    env: docker
+    dockerfilePath: ./Dockerfile
+    envVars:
+      - key: POSTGRES_USER
+        sync: false
+      - key: POSTGRES_PASSWORD
+        sync: false
+      - key: POSTGRES_DB
+        value: hotel_tracker
+      - key: DATABASE_URL
+        fromDatabase:
+          name: hotel-tracker-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          name: hotel-tracker-redis
+          type: redis
+          property: connectionString
+    healthCheckPath: /health
+    autoDeploy: true
+
+  - type: worker
+    name: hotel-tracker-celery
+    env: docker
+    dockerfilePath: ./Dockerfile
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: hotel-tracker-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          name: hotel-tracker-redis
+          type: redis
+          property: connectionString
+    command: celery -A backend.tasks.celery worker --loglevel=info
+
+databases:
+  - name: hotel-tracker-db
+    databaseName: hotel_tracker
+    user: hotel_tracker
+    plan: starter
+
+redis:
+  - name: hotel-tracker-redis
+    plan: free
+    maxmemoryPolicy: noeviction

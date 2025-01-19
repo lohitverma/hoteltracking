@@ -1,0 +1,64 @@
+name: Pull Request Checks
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install black flake8 mypy
+
+      - name: Check code formatting
+        run: black --check .
+
+      - name: Run linting
+        run: flake8 .
+
+      - name: Type checking
+        run: mypy backend/
+
+      - name: Check for sensitive data
+        uses: zricethezav/gitleaks-action@master
+
+  test-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Build Docker image
+        run: docker build -t hoteltracker-test .
+
+      - name: Run tests in container
+        run: |
+          docker run hoteltracker-test pytest
+
+  size-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: andymckay/labeler@master
+        with:
+          add-labels: "needs-review"
+          remove-labels: "approved"
+
+      - name: Check PR size
+        uses: matchai/pr-size-checker@v1
+        with:
+          small_label: "size/small"
+          medium_label: "size/medium"
+          large_label: "size/large"
+          excluded_files: "*.lock, *.json, *.md"

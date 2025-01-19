@@ -1,0 +1,26 @@
+name: Deployment Configuration
+
+env:
+  # AWS Configuration
+  AWS_REGION: us-west-2
+  ECR_REPOSITORY: hoteltracker
+  ECS_CLUSTER: hoteltracker-cluster
+  ECS_SERVICE: hoteltracker-service
+  ECS_TASK_DEFINITION: hoteltracker-task
+
+  # Application Configuration
+  DOMAIN: hoteltracker.org
+  ENVIRONMENT: production
+  
+  # Monitoring Configuration
+  ENABLE_MONITORING: true
+  GRAFANA_DOMAIN: grafana.hoteltracker.org
+  PROMETHEUS_DOMAIN: prometheus.hoteltracker.org
+
+  # Backup Configuration
+  BACKUP_ENABLED: true
+  BACKUP_RETENTION_DAYS: 30
+  
+  # Security Configuration
+  ENABLE_WAF: true
+  SSL_POLICY: ELBSecurityPolicy-TLS-1-2-2017-01

@@ -1,0 +1,40 @@
+{
+    "Rules": [
+        {
+            "ID": "Daily Backups Retention",
+            "Status": "Enabled",
+            "Filter": {
+                "Prefix": "database/"
+            },
+            "Transitions": [
+                {
+                    "Days": 30,
+                    "StorageClass": "STANDARD_IA"
+                },
+                {
+                    "Days": 90,
+                    "StorageClass": "GLACIER"
+                }
+            ],
+            "Expiration": {
+                "Days": 365
+            }
+        },
+        {
+            "ID": "Logs Retention",
+            "Status": "Enabled",
+            "Filter": {
+                "Prefix": "logs/"
+            },
+            "Transitions": [
+                {
+                    "Days": 30,
+                    "StorageClass": "GLACIER"
+                }
+            ],
+            "Expiration": {
+                "Days": 90
+            }
+        }
+    ]
+}
