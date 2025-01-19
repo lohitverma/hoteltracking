@@ -4,6 +4,8 @@ services:
     env: docker
     dockerfilePath: ./Dockerfile
     envVars:
+      - key: PORT
+        value: 10000
       - key: POSTGRES_USER
         sync: false
       - key: POSTGRES_PASSWORD
@@ -19,6 +21,14 @@ services:
           name: hotel-tracker-redis
           type: redis
           property: connectionString
+      - key: SECRET_KEY
+        generateValue: true
+      - key: ENVIRONMENT
+        value: production
+      - key: DEBUG
+        value: false
+      - key: ALLOWED_HOSTS
+        value: .onrender.com
     healthCheckPath: /health
     autoDeploy: true
 
