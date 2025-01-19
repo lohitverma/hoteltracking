@@ -1,67 +1,56 @@
-# Hotel Price Tracker
+# 🏨 Hotel Price Tracker
+
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy)
+![Python](https://img.shields.io/badge/python-3.11-blue.svg)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.95-green.svg)
+![License](https://img.shields.io/badge/license-MIT-blue.svg)
 
 A professional hotel price tracking platform with real-time alerts and analytics.
 
-## Features
+## ✨ Features
 
-- Real-time hotel price tracking
-- SMS and email price alerts
-- Advanced analytics and insights
-- User authentication and preferences
-- Price history visualization
-- Search history tracking
-- Mobile-responsive design
+- 🔍 Real-time hotel price tracking
+- 📊 Advanced analytics and insights
+- 🔔 SMS and email price alerts
+- 📍 User authentication and preferences
+- 📈 Price history visualization
+- 📱 Mobile-responsive design
+- 🚀 High-performance async operations
+- 🔒 Rate limiting and security features
 
-## Tech Stack
-
-### Backend
-- FastAPI (Python)
-- PostgreSQL
-- SQLAlchemy ORM
-- Twilio (SMS alerts)
-- SendGrid (Email notifications)
-- Segment (Analytics)
-- JWT Authentication
-
-### Frontend
-- React
-- Chart.js
-- Tailwind CSS
-- Socket.IO (Real-time updates)
-
-## Setup Instructions
+## 🚀 Setup Instructions
 
 ### Local Development
 
 1. Create a virtual environment:
-```bash
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-```
+   ```bash
+   python -m venv venv
+   source venv/bin/activate  # On Windows: venv\Scripts\activate
+   ```
 
 2. Install dependencies:
-```bash
-pip install -r requirements.txt
-```
+   ```bash
+   pip install -r requirements.txt
+   ```
 
 3. Set up PostgreSQL database
 
 4. Create .env file:
-```bash
-cp backend/.env.example backend/.env
-# Update the .env file with your credentials
-```
+   ```bash
+   cp backend/.env.example backend/.env
+   # Update the .env file with your credentials
+   ```
 
 5. Initialize the database:
-```bash
-alembic upgrade head
-```
+   ```bash
+   alembic upgrade head
+   ```
 
 6. Run the backend server:
-```bash
-cd backend
-uvicorn main:app --reload
-```
+   ```bash
+   cd backend
+   uvicorn main:app --reload
+   ```
 
 ### Production Deployment
 
@@ -97,7 +86,7 @@ uvicorn main:app --reload
    - Get Write Key
    - Set up tracking plan
 
-## Environment Variables
+## 🔧 Environment Variables
 
 Create a `.env` file with the following variables:
 ```
@@ -111,20 +100,31 @@ SENDGRID_FROM_EMAIL=your-verified-email
 SEGMENT_WRITE_KEY=your-segment-key
 ```
 
-## API Documentation
+## 📈 API Documentation
 
 Access the API documentation at `/docs` endpoint.
 
-## Analytics Dashboard
+## 🔒 Security Features
 
-Access analytics at `/analytics` endpoint (admin only).
+- Rate Limiting
+- JWT Authentication
+- CORS Protection
+- Input Validation
+- SQL Injection Prevention
+- XSS Protection
 
-## Contributing
+## 📚 Contributing
 
 1. Fork the repository
 2. Create feature branch
 3. Submit pull request
 
-## License
+## 📝 License
 
 MIT License
+
+## 🙏 Acknowledgments
+
+- FastAPI for the amazing framework
+- Render for hosting
+- All our contributors and users

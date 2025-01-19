@@ -1,7 +1,7 @@
-from fastapi import FastAPI, HTTPException, Depends
+from fastapi import FastAPI, HTTPException, Depends, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel
 from typing import List, Optional, Dict
 from datetime import datetime
@@ -15,13 +15,46 @@ from models import User, Hotel, PriceAlert
 import logging
 from hotel_apis.analytics_routes import router as analytics_router
 from hotel_apis.city_routes import router as city_router
+import time
 
 load_dotenv()
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="Hotel Price Tracker API")
+app = FastAPI(
+    title="Hotel Tracker API",
+    description="""
+    🏨 A modern API for tracking hotel prices and availability across multiple platforms.
+    
+    ## Features
+    
+    * 🔍 Real-time hotel search across multiple providers
+    * 📊 Price analytics and historical data
+    * 🔔 Price alert notifications
+    * 📍 Location-based hotel recommendations
+    * 📱 Mobile-friendly API design
+    
+    ## Getting Started
+    
+    1. Use the `/api/cities` endpoint to search for cities
+    2. Use `/api/hotels/search` to find hotels in your chosen city
+    3. Set up price alerts using `/api/alerts/create`
+    """,
+    version="1.0.0",
+    docs_url="/api/docs",
+    redoc_url="/api/redoc",
+    openapi_url="/api/openapi.json",
+    contact={
+        "name": "Hotel Tracker Support",
+        "url": "https://hoteltracker.org/support",
+        "email": "support@hoteltracker.org",
+    },
+    license_info={
+        "name": "MIT",
+        "url": "https://opensource.org/licenses/MIT",
+    }
+)
 
-# Enable CORS
+# Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -29,6 +62,28 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Add custom middleware for request logging
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    start_time = time.time()
+    response = await call_next(request)
+    process_time = time.time() - start_time
+    response.headers["X-Process-Time"] = str(process_time)
+    return response
+
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request: Request, exc: HTTPException):
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={
+            "error": {
+                "code": exc.status_code,
+                "message": exc.detail,
+                "path": request.url.path
+            }
+        }
+    )
 
 # Mount static files
 app.mount("/static", StaticFiles(directory="static"), name="static")
@@ -58,7 +113,18 @@ class LocationResponse(BaseModel):
 
 @app.get("/")
 async def root():
-    return {"message": "Welcome to Hotel Tracker API"}
+    """
+    🏠 Welcome to Hotel Tracker API
+    
+    Returns a welcome message and basic API information.
+    """
+    return {
+        "message": "Welcome to Hotel Tracker API",
+        "version": "1.0.0",
+        "docs_url": "/api/docs",
+        "status": "operational",
+        "timestamp": datetime.datetime.utcnow().isoformat()
+    }
 
 @app.get("/api/locations/search")
 async def search_locations(
@@ -220,26 +286,48 @@ async def get_hotel_details(
 
 @app.get("/health")
 async def health_check():
-    try:
-        # Check database connection
-        await database.database.execute("SELECT 1")
-        db_status = "healthy"
-    except Exception as e:
-        db_status = f"unhealthy: {str(e)}"
-
-    try:
-        # Check Redis connection
-        await cache.redis.ping()
-        redis_status = "healthy"
-    except Exception as e:
-        redis_status = f"unhealthy: {str(e)}"
-
-    return {
+    """
+    💓 API Health Check
+    
+    Checks the health status of all system components.
+    """
+    status = {
         "status": "healthy",
-        "database": db_status,
-        "redis": redis_status,
-        "timestamp": datetime.datetime.utcnow().isoformat()
+        "timestamp": datetime.datetime.utcnow().isoformat(),
+        "components": {
+            "api": "healthy",
+            "database": "unknown",
+            "redis": "unknown",
+            "celery": "unknown"
+        }
     }
+    
+    try:
+        await database.database.execute("SELECT 1")
+        status["components"]["database"] = "healthy"
+    except Exception as e:
+        status["components"]["database"] = f"unhealthy: {str(e)}"
+        status["status"] = "degraded"
+
+    try:
+        await cache.redis.ping()
+        status["components"]["redis"] = "healthy"
+    except Exception as e:
+        status["components"]["redis"] = f"unhealthy: {str(e)}"
+        status["status"] = "degraded"
+
+    try:
+        celery_inspect = app.celery_app.control.inspect()
+        if celery_inspect.active():
+            status["components"]["celery"] = "healthy"
+        else:
+            status["components"]["celery"] = "no workers available"
+            status["status"] = "degraded"
+    except Exception as e:
+        status["components"]["celery"] = f"unhealthy: {str(e)}"
+        status["status"] = "degraded"
+
+    return status
 
 app.include_router(analytics_router)
 app.include_router(city_router)
