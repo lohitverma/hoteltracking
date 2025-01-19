@@ -57,8 +57,8 @@ class LocationResponse(BaseModel):
     timezone: Optional[str]
 
 @app.get("/")
-async def read_root():
-    return FileResponse("static/index.html")
+async def root():
+    return {"message": "Welcome to Hotel Tracker API"}
 
 @app.get("/api/locations/search")
 async def search_locations(
@@ -220,7 +220,26 @@ async def get_hotel_details(
 
 @app.get("/health")
 async def health_check():
-    return {"status": "healthy"}
+    try:
+        # Check database connection
+        await database.database.execute("SELECT 1")
+        db_status = "healthy"
+    except Exception as e:
+        db_status = f"unhealthy: {str(e)}"
+
+    try:
+        # Check Redis connection
+        await cache.redis.ping()
+        redis_status = "healthy"
+    except Exception as e:
+        redis_status = f"unhealthy: {str(e)}"
+
+    return {
+        "status": "healthy",
+        "database": db_status,
+        "redis": redis_status,
+        "timestamp": datetime.datetime.utcnow().isoformat()
+    }
 
 app.include_router(analytics_router)
 app.include_router(city_router)
