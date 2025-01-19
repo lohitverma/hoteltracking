@@ -17,6 +17,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     libpq-dev \
     python3-dev \
+    gcc \
     && rm -rf /var/lib/apt/lists/*
 
 # Create non-root user
@@ -34,10 +35,11 @@ RUN chown appuser:appuser /app/requirements.txt
 USER appuser
 
 # Upgrade pip and install wheel
-RUN pip install --upgrade pip wheel setuptools
+RUN pip install --upgrade pip setuptools wheel
 
 # Install dependencies
-RUN pip wheel --no-deps --no-cache-dir --wheel-dir /app/wheels -r requirements.txt
+RUN pip wheel --no-deps --no-cache-dir --wheel-dir /app/wheels -r requirements.txt && \
+    pip wheel --no-deps --no-cache-dir --wheel-dir /app/wheels anyio==3.7.1
 
 # Final stage
 FROM python:3.11-slim
@@ -78,8 +80,9 @@ USER appuser
 RUN pip install --upgrade pip
 
 # Install dependencies
-RUN pip install --no-cache-dir --no-index --find-links=/app/wheels -r requirements.txt \
-    && rm -rf /app/wheels
+RUN pip install --no-cache-dir anyio==3.7.1 && \
+    pip install --no-cache-dir --no-index --find-links=/app/wheels -r requirements.txt && \
+    rm -rf /app/wheels
 
 # Copy application code
 COPY --chown=appuser:appuser . .
