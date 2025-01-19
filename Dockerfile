@@ -67,13 +67,8 @@ COPY --chown=appuser:appuser . .
 # Switch to non-root user
 USER appuser
 
-# Create start script
-RUN echo '#!/bin/bash\n\
-echo "Starting Hotel Tracker API..."\n\
-echo "Environment: $ENVIRONMENT"\n\
-echo "Allowed Hosts: $ALLOWED_HOSTS"\n\
-exec uvicorn backend.main:app --host 0.0.0.0 --port "${PORT:-10000}" --workers 4' > start.sh && \
-    chmod +x start.sh
+# Make start script executable
+RUN chmod +x start.sh
 
 EXPOSE $PORT
 CMD ["./start.sh"]
