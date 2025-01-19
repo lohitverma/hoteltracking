@@ -7,9 +7,9 @@ services:
       - key: ENVIRONMENT
         value: production
       - key: DEBUG
-        value: false
+        value: "false"
       - key: ALLOWED_HOSTS
-        value: .onrender.com
+        value: ".onrender.com"
       - key: SECRET_KEY
         generateValue: true
       - key: DATABASE_URL
@@ -21,6 +21,10 @@ services:
           name: hotel-tracker-redis
           type: redis
           property: connectionString
+      - key: PYTHONUNBUFFERED
+        value: "1"
+      - key: PYTHONDONTWRITEBYTECODE
+        value: "1"
     healthCheckPath: /health
     autoDeploy: true
 
@@ -40,6 +44,10 @@ services:
           name: hotel-tracker-redis
           type: redis
           property: connectionString
+      - key: PYTHONUNBUFFERED
+        value: "1"
+      - key: PYTHONDONTWRITEBYTECODE
+        value: "1"
     command: celery -A backend.tasks.celery worker --loglevel=info
 
 databases:

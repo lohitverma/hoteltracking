@@ -22,7 +22,11 @@ RUN useradd -m appuser
 
 # Set working directory and change ownership
 WORKDIR /app
-COPY --chown=appuser:appuser requirements.txt .
+RUN mkdir -p /app/wheels && chown -R appuser:appuser /app /opt/venv
+
+# Copy requirements and set ownership
+COPY requirements.txt /app/
+RUN chown appuser:appuser /app/requirements.txt
 
 # Switch to non-root user
 USER appuser
@@ -49,7 +53,9 @@ ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 # Create non-root user
 RUN useradd -m appuser
 
+# Set up directories
 WORKDIR /app
+RUN mkdir -p /app/wheels && chown -R appuser:appuser /app /opt/venv
 
 # Copy wheels and requirements from builder
 COPY --from=builder --chown=appuser:appuser /app/wheels /app/wheels
