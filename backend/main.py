@@ -41,6 +41,7 @@ from services.oauth_service import OAuthService
 from services.cache_service import CacheService
 from services.email_verification_service import EmailVerificationService
 from services.price_tracking_service import PriceTrackingService
+from services.health_service import HealthService
 
 load_dotenv()
 logger = logging.getLogger(__name__)
@@ -189,6 +190,9 @@ oauth_service = OAuthService()
 # Initialize email verification service
 email_verification_service = EmailVerificationService()
 
+# Initialize health service
+health_service = HealthService(SessionLocal(), redis_client)
+
 # Add custom middleware for request logging
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
@@ -320,32 +324,46 @@ async def search_hotels(
         logger.error(f"Error searching hotels: {str(e)}")
         raise HTTPException(status_code=500, detail="Error searching hotels")
 
-@app.get("/health")
+@app.get("/health", tags=["Monitoring"])
 async def health_check():
     """
-    💓 API Health Check
+    Get complete health status of all system components.
     
-    Checks the health status of all system components.
+    Returns:
+    - Overall system status (healthy/warning/unhealthy)
+    - Status of individual components:
+        - Database
+        - Redis
+        - External services
+        - System resources
+        - Network
     """
-    status = {
-        "status": "healthy",
-        "timestamp": int(time()),
-        "version": "1.0.0"
-    }
-    
-    try:
-        await database.database.execute("SELECT 1")
-    except Exception as e:
-        status["status"] = "unhealthy"
-        status["error"] = str(e)
+    return await health_service.get_complete_health_status()
 
-    try:
-        await cache.redis.ping()
-    except Exception as e:
-        status["status"] = "unhealthy"
-        status["error"] = str(e)
+@app.get("/health/database", tags=["Monitoring"])
+async def database_health():
+    """Check database health status"""
+    return await health_service.check_database()
 
-    return status
+@app.get("/health/redis", tags=["Monitoring"])
+async def redis_health():
+    """Check Redis health status"""
+    return await health_service.check_redis()
+
+@app.get("/health/external", tags=["Monitoring"])
+async def external_services_health():
+    """Check external services health status"""
+    return await health_service.check_external_services()
+
+@app.get("/health/system", tags=["Monitoring"])
+async def system_health():
+    """Check system resources health status"""
+    return health_service.check_system_resources()
+
+@app.get("/health/network", tags=["Monitoring"])
+async def network_health():
+    """Check network health status"""
+    return health_service.check_network()
 
 @app.get("/metrics")
 async def metrics():
