@@ -41,6 +41,7 @@ ENV PYTHONUNBUFFERED=1 \
 # Install runtime dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq5 \
+    postgresql-client \
     && rm -rf /var/lib/apt/lists/*
 
 # Create virtual environment
@@ -57,7 +58,8 @@ COPY . .
 
 # Set permissions
 RUN chown -R appuser:appuser /app /opt/venv && \
-    chmod +x start.sh
+    chmod +x start.sh && \
+    chmod -R 755 migrations
 
 # Switch to non-root user
 USER appuser
