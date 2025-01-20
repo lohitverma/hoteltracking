@@ -20,16 +20,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     && rm -rf /var/lib/apt/lists/*
 
-# Create non-root user
-RUN useradd -m appuser
-
-# Set working directory and change ownership
+# Set working directory
 WORKDIR /app
 COPY requirements.txt .
-RUN chown -R appuser:appuser /app /opt/venv
-
-# Switch to non-root user
-USER appuser
 
 # Upgrade pip and install dependencies
 RUN pip install --upgrade pip setuptools wheel && \
@@ -57,18 +50,20 @@ ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 # Create non-root user
 RUN useradd -m appuser
 
-# Set up directories and copy files
+# Set up directories
 WORKDIR /app
-COPY --from=builder --chown=appuser:appuser /opt/venv /opt/venv
-COPY --chown=appuser:appuser . .
+COPY --from=builder /opt/venv /opt/venv
+COPY . .
+
+# Set permissions
+RUN chown -R appuser:appuser /app /opt/venv && \
+    chmod +x start.sh
 
 # Switch to non-root user
 USER appuser
 
-# Make start script executable
-RUN chmod +x start.sh
-
 # Expose the port
 EXPOSE ${PORT}
 
-CMD uvicorn backend.main:app --host 0.0.0.0 --port ${PORT} --workers 4
+# Start the application
+CMD ["./start.sh"]
