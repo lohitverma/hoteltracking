@@ -44,21 +44,25 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     postgresql-client \
     && rm -rf /var/lib/apt/lists/*
 
-# Create virtual environment
-RUN python -m venv $VIRTUAL_ENV
-ENV PATH="$VIRTUAL_ENV/bin:$PATH"
-
 # Create non-root user
 RUN useradd -m appuser
 
-# Set up directories
+# Set up directories and permissions
 WORKDIR /app
-COPY --from=builder /opt/venv /opt/venv
-COPY . .
+RUN mkdir -p /opt/venv /app/migrations/versions && \
+    chown -R appuser:appuser /opt/venv /app
 
-# Set permissions
-RUN chown -R appuser:appuser /app /opt/venv && \
-    chmod +x start.sh && \
+# Create virtual environment
+RUN python -m venv $VIRTUAL_ENV && \
+    chown -R appuser:appuser $VIRTUAL_ENV
+ENV PATH="$VIRTUAL_ENV/bin:$PATH"
+
+# Copy virtual environment and application files
+COPY --from=builder /opt/venv /opt/venv
+COPY --chown=appuser:appuser . .
+
+# Set file permissions
+RUN chmod +x start.sh && \
     chmod -R 755 migrations
 
 # Switch to non-root user
