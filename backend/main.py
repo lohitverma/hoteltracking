@@ -17,6 +17,9 @@ from hotel_apis.analytics_routes import router as analytics_router
 from hotel_apis.city_routes import router as city_router
 from prometheus_client import Counter, Histogram, Gauge, generate_latest, CONTENT_TYPE_LATEST
 import psutil
+from fastapi.middleware.httpsredirect import HTTPSRedirectMiddleware
+from fastapi.middleware.trustedhost import TrustedHostMiddleware
+from fastapi.middleware.securityheaders import SecurityHeadersMiddleware
 
 load_dotenv()
 logger = logging.getLogger(__name__)
@@ -62,6 +65,38 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+)
+
+# Security middleware
+if os.getenv("ENVIRONMENT") == "production":
+    # Force HTTPS
+    app.add_middleware(HTTPSRedirectMiddleware)
+    
+    # Trusted hosts
+    app.add_middleware(
+        TrustedHostMiddleware,
+        allowed_hosts=[
+            "hoteltracker.org",
+            "api.hoteltracker.org",
+            "www.hoteltracker.org",
+            "hotel-tracker-api.onrender.com"
+        ]
+    )
+
+# Security headers
+app.add_middleware(
+    SecurityHeadersMiddleware,
+    content_security_policy={
+        "default-src": "'self'",
+        "img-src": ["'self'", "data:", "https:"],
+        "script-src": ["'self'", "'unsafe-inline'"],
+        "style-src": ["'self'", "'unsafe-inline'"],
+    },
+    strict_transport_security={"max-age": 31536000, "includeSubDomains": True},
+    x_frame_options="DENY",
+    x_content_type_options="nosniff",
+    x_xss_protection="1; mode=block",
+    referrer_policy="strict-origin-when-cross-origin"
 )
 
 # Metrics

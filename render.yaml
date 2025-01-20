@@ -6,6 +6,10 @@ services:
     plan: starter
     dockerfilePath: ./Dockerfile
     healthCheckPath: /health
+    domains:
+      - hoteltracker.org
+      - api.hoteltracker.org
+      - www.hoteltracker.org
     envVars:
       - key: PORT
         value: 10000
@@ -20,6 +24,24 @@ services:
       - key: PYTHONDONTWRITEBYTECODE
         value: "1"
     autoDeploy: true
+    headers:
+      - path: /*
+        name: Strict-Transport-Security
+        value: max-age=31536000; includeSubDomains
+      - path: /*
+        name: X-Frame-Options
+        value: DENY
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff
+      - path: /*
+        name: Referrer-Policy
+        value: strict-origin-when-cross-origin
+    routes:
+      - type: redirect
+        source: http://*
+        destination: https://$HOST
+        status: 301
     buildCommand: docker build -t hotel-tracker .
     startCommand: docker run -p 10000:10000 -e PORT=10000 hotel-tracker
 
