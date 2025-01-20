@@ -15,7 +15,8 @@ import cache
 import logging
 from hotel_apis.analytics_routes import router as analytics_router
 from hotel_apis.city_routes import router as city_router
-import time
+from prometheus_client import Counter, Histogram, Gauge, generate_latest, CONTENT_TYPE_LATEST
+import psutil
 
 load_dotenv()
 logger = logging.getLogger(__name__)
@@ -63,11 +64,33 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Metrics
+REQUEST_COUNT = Counter('http_requests_total', 'Total HTTP requests', ['method', 'endpoint', 'status'])
+REQUEST_LATENCY = Histogram('http_request_duration_seconds', 'HTTP request latency')
+MEMORY_USAGE = Gauge('memory_usage_bytes', 'Memory usage in bytes')
+CPU_USAGE = Gauge('cpu_usage_percent', 'CPU usage percentage')
+
 # Add custom middleware for request logging
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
     start_time = time.time()
+    
     response = await call_next(request)
+    
+    # Record request metrics
+    REQUEST_COUNT.labels(
+        method=request.method,
+        endpoint=request.url.path,
+        status=response.status_code
+    ).inc()
+    
+    # Record latency
+    REQUEST_LATENCY.observe(time.time() - start_time)
+    
+    # Record system metrics
+    MEMORY_USAGE.set(psutil.Process().memory_info().rss)
+    CPU_USAGE.set(psutil.cpu_percent())
+    
     process_time = time.time() - start_time
     response.headers["X-Process-Time"] = str(process_time)
     return response
@@ -173,6 +196,40 @@ async def search_hotels(
     except Exception as e:
         logger.error(f"Error searching hotels: {str(e)}")
         raise HTTPException(status_code=500, detail="Error searching hotels")
+
+@app.get("/health")
+async def health_check():
+    """
+    💓 API Health Check
+    
+    Checks the health status of all system components.
+    """
+    status = {
+        "status": "healthy",
+        "timestamp": int(time()),
+        "version": "1.0.0"
+    }
+    
+    try:
+        await database.database.execute("SELECT 1")
+    except Exception as e:
+        status["status"] = "unhealthy"
+        status["error"] = str(e)
+
+    try:
+        await cache.redis.ping()
+    except Exception as e:
+        status["status"] = "unhealthy"
+        status["error"] = str(e)
+
+    return status
+
+@app.get("/metrics")
+async def metrics():
+    return Response(
+        generate_latest(),
+        media_type=CONTENT_TYPE_LATEST
+    )
 
 @app.get("/health")
 async def health_check():
