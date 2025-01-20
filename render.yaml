@@ -42,38 +42,15 @@ services:
         source: http://*
         destination: https://$HOST
         status: 301
-    buildCommand: docker build -t hotel-tracker .
-    startCommand: docker run -p 10000:10000 -e PORT=10000 hotel-tracker
 
-  - type: worker
-    name: hotel-tracker-celery
-    env: docker
-    dockerfilePath: ./Dockerfile
-    envVars:
-      - key: ENVIRONMENT
-        value: production
-      - key: DATABASE_URL
-        fromDatabase:
-          name: hotel-tracker-db
-          property: connectionString
-      - key: REDIS_URL
-        fromService:
-          name: hotel-tracker-redis
-          type: redis
-          property: connectionString
-      - key: PYTHONUNBUFFERED
-        value: "1"
-      - key: PYTHONDONTWRITEBYTECODE
-        value: "1"
-    command: celery -A backend.tasks.celery worker --loglevel=info
+  - type: redis
+    name: hotel-tracker-redis
+    ipAllowList: []
+    plan: free
+    maxmemoryPolicy: noeviction
 
 databases:
   - name: hotel-tracker-db
     databaseName: hotel_tracker
     plan: starter
     ipAllowList: [] # allow all
-
-redis:
-  - name: hotel-tracker-redis
-    plan: free
-    maxmemoryPolicy: noeviction

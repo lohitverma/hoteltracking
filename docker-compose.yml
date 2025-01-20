@@ -1,75 +1,72 @@
 version: '3.8'
 
 services:
-  web:
-    build: .
+  frontend:
+    image: ${DOCKER_REGISTRY}/hotel-tracker-frontend:latest
+    restart: always
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    environment:
+      - REACT_APP_API_URL=https://api.hoteltracker.com
+      - NODE_ENV=production
+    networks:
+      - hotel-network
+
+  backend:
+    image: ${DOCKER_REGISTRY}/hotel-tracker-backend:latest
+    restart: always
     ports:
       - "8000:8000"
     environment:
-      - DATABASE_URL=postgresql://postgres:postgres@db:5432/hoteltracker
-      - REDIS_URL=redis://redis:6379/0
+      - DATABASE_URL=postgresql://${DB_USER}:${DB_PASSWORD}@db:5432/${DB_NAME}
+      - SECRET_KEY=${SECRET_KEY}
+      - ENVIRONMENT=production
     depends_on:
       - db
-      - redis
-    volumes:
-      - ./:/app
-    restart: unless-stopped
+    networks:
+      - hotel-network
 
   db:
-    image: postgres:15
-    environment:
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
-      - POSTGRES_DB=hoteltracker
+    image: postgres:15-alpine
+    restart: always
     volumes:
       - postgres_data:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"
-    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=${DB_USER}
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+      - POSTGRES_DB=${DB_NAME}
+    networks:
+      - hotel-network
 
   redis:
-    image: redis:7
-    ports:
-      - "6379:6379"
+    image: redis:7-alpine
+    restart: always
     volumes:
       - redis_data:/data
-    restart: unless-stopped
-
-  celery:
-    build: .
-    command: celery -A backend.tasks worker --loglevel=info
-    environment:
-      - DATABASE_URL=postgresql://postgres:postgres@db:5432/hoteltracker
-      - REDIS_URL=redis://redis:6379/0
-    depends_on:
-      - web
-      - redis
-      - db
-    volumes:
-      - ./:/app
-    restart: unless-stopped
+    networks:
+      - hotel-network
 
   nginx:
     image: nginx:alpine
+    restart: always
     ports:
-      - "80:80"
       - "443:443"
     volumes:
-      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
-      - ./static:/app/static:ro
-      - ./certbot/conf:/etc/letsencrypt
-      - ./certbot/www:/var/www/certbot
+      - ./nginx/conf.d:/etc/nginx/conf.d
+      - ./nginx/ssl:/etc/nginx/ssl
+      - ./nginx/www:/var/www
     depends_on:
-      - web
-    restart: unless-stopped
-
-  certbot:
-    image: certbot/certbot
-    volumes:
-      - ./certbot/conf:/etc/letsencrypt
-      - ./certbot/www:/var/www/certbot
-    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done;'"
+      - frontend
+      - backend
+    networks:
+      - hotel-network
 
 volumes:
   postgres_data:
   redis_data:
+
+networks:
+  hotel-network:
+    driver: bridge

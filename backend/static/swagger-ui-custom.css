@@ -1,0 +1,161 @@
+/* Custom styles for Swagger UI */
+:root {
+    --primary-color: #2563eb;
+    --secondary-color: #1e40af;
+    --text-color: #1f2937;
+    --background-color: #f3f4f6;
+    --border-color: #e5e7eb;
+}
+
+/* Header */
+.swagger-ui .topbar {
+    background-color: var(--primary-color);
+    padding: 1rem;
+}
+
+.swagger-ui .topbar-wrapper img {
+    content: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="white" width="24" height="24"><path d="M2.25 12l8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25"/></svg>');
+}
+
+/* Navigation */
+.swagger-ui .opblock-tag {
+    border-bottom: 1px solid var(--border-color);
+    padding: 1rem;
+    margin: 0;
+}
+
+.swagger-ui .opblock-tag:hover {
+    background-color: var(--background-color);
+}
+
+/* Endpoints */
+.swagger-ui .opblock {
+    border-radius: 0.5rem;
+    margin: 1rem 0;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.swagger-ui .opblock.opblock-get {
+    border-color: var(--primary-color);
+}
+
+.swagger-ui .opblock.opblock-post {
+    border-color: #10b981;
+}
+
+.swagger-ui .opblock.opblock-delete {
+    border-color: #ef4444;
+}
+
+.swagger-ui .opblock.opblock-put {
+    border-color: #f59e0b;
+}
+
+/* Parameters */
+.swagger-ui .parameters-container {
+    padding: 1rem;
+}
+
+.swagger-ui .parameters-col_description {
+    font-size: 0.875rem;
+}
+
+.swagger-ui .parameter__name {
+    font-weight: 600;
+}
+
+/* Models */
+.swagger-ui .model-box {
+    background-color: var(--background-color);
+    padding: 1rem;
+    border-radius: 0.5rem;
+}
+
+.swagger-ui .model-title {
+    font-size: 1rem;
+    font-weight: 600;
+}
+
+/* Responses */
+.swagger-ui .responses-wrapper {
+    padding: 1rem;
+}
+
+.swagger-ui .response-col_status {
+    font-weight: 600;
+}
+
+/* Try it out */
+.swagger-ui .btn.execute {
+    background-color: var(--primary-color);
+}
+
+.swagger-ui .btn.execute:hover {
+    background-color: var(--secondary-color);
+}
+
+/* Authentication */
+.swagger-ui .auth-wrapper {
+    padding: 1rem;
+}
+
+.swagger-ui .auth-btn-wrapper {
+    display: flex;
+    gap: 0.5rem;
+}
+
+/* Code examples */
+.swagger-ui .highlight-code {
+    background-color: #1f2937;
+    color: #f3f4f6;
+    padding: 1rem;
+    border-radius: 0.5rem;
+}
+
+/* Tables */
+.swagger-ui table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.swagger-ui table thead tr {
+    background-color: var(--background-color);
+}
+
+.swagger-ui table th,
+.swagger-ui table td {
+    padding: 0.75rem;
+    border: 1px solid var(--border-color);
+}
+
+/* Markdown content */
+.swagger-ui .markdown p {
+    margin: 0.5rem 0;
+    line-height: 1.5;
+}
+
+.swagger-ui .markdown code {
+    background-color: var(--background-color);
+    padding: 0.125rem 0.25rem;
+    border-radius: 0.25rem;
+    font-size: 0.875rem;
+}
+
+/* Scrollbars */
+.swagger-ui ::-webkit-scrollbar {
+    width: 0.5rem;
+    height: 0.5rem;
+}
+
+.swagger-ui ::-webkit-scrollbar-track {
+    background-color: var(--background-color);
+}
+
+.swagger-ui ::-webkit-scrollbar-thumb {
+    background-color: var(--border-color);
+    border-radius: 0.25rem;
+}
+
+.swagger-ui ::-webkit-scrollbar-thumb:hover {
+    background-color: var(--text-color);
+}

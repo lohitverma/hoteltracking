@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verify Your Email</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .container {
+            background-color: #ffffff;
+            border-radius: 8px;
+            padding: 30px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .logo {
+            max-width: 150px;
+            height: auto;
+        }
+        .title {
+            color: #2563eb;
+            font-size: 24px;
+            margin: 20px 0;
+        }
+        .content {
+            margin-bottom: 30px;
+        }
+        .button {
+            display: inline-block;
+            background-color: #2563eb;
+            color: #ffffff;
+            text-decoration: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            font-weight: 600;
+            margin: 20px 0;
+        }
+        .button:hover {
+            background-color: #1e40af;
+        }
+        .footer {
+            text-align: center;
+            font-size: 14px;
+            color: #666;
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #eee;
+        }
+        .help {
+            margin-top: 20px;
+            font-size: 14px;
+            color: #666;
+        }
+        @media only screen and (max-width: 600px) {
+            body {
+                padding: 10px;
+            }
+            .container {
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <img src="https://your-domain.com/logo.png" alt="Hotel Tracker" class="logo">
+            <h1 class="title">Verify Your Email Address</h1>
+        </div>
+        
+        <div class="content">
+            <p>Hi {{ user_name }},</p>
+            
+            <p>Thank you for signing up for Hotel Tracker! To complete your registration and start tracking hotel prices, please verify your email address by clicking the button below:</p>
+            
+            <p style="text-align: center;">
+                <a href="{{ verification_url }}" class="button">Verify Email Address</a>
+            </p>
+            
+            <p>This verification link will expire in 24 hours. If you don't verify your email within this time, you'll need to request a new verification link.</p>
+            
+            <p>If you didn't create an account with Hotel Tracker, you can safely ignore this email.</p>
+            
+            <div class="help">
+                <p>Having trouble with the button above? Copy and paste this URL into your browser:</p>
+                <p style="word-break: break-all;">{{ verification_url }}</p>
+            </div>
+        </div>
+        
+        <div class="footer">
+            <p>Hotel Tracker - Track hotel prices and get the best deals</p>
+            <p>© 2025 Hotel Tracker. All rights reserved.</p>
+        </div>
+    </div>
+</body>
+</html>
