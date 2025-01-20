@@ -14,7 +14,7 @@ services:
       - key: DEBUG
         value: "false"
       - key: ALLOWED_HOSTS
-        value: ".onrender.com"
+        value: ".onrender.com,hoteltracker.org,api.hoteltracker.org,www.hoteltracker.org"
       - key: PYTHONUNBUFFERED
         value: "1"
       - key: PYTHONDONTWRITEBYTECODE
