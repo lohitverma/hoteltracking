@@ -7,6 +7,7 @@ services:
     dockerfilePath: ./Dockerfile
     healthCheckPath: /health
     port: 10000
+    startCommand: ./entrypoint.sh
     domains:
       - hoteltracker.org
       - api.hoteltracker.org
