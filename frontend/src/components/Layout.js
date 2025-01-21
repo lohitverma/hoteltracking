@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import {
   AppBar,
   Box,
+  CssBaseline,
   Drawer,
   IconButton,
   List,
@@ -11,139 +12,64 @@ import {
   ListItemText,
   Toolbar,
   Typography,
-  useTheme,
-  useMediaQuery,
+  Divider
 } from '@mui/material';
 import {
   Menu as MenuIcon,
-  Search as SearchIcon,
-  Notifications as NotificationsIcon,
-  Chat as ChatIcon,
   Home as HomeIcon,
-  ChevronLeft as ChevronLeftIcon,
+  Notifications as NotificationsIcon,
+  Analytics as AnalyticsIcon
 } from '@mui/icons-material';
-import styled from '@emotion/styled';
 
 const drawerWidth = 240;
 
-const Main = styled('main', { shouldForwardProp: (prop) => prop !== 'open' })(
-  ({ theme, open }) => ({
-    flexGrow: 1,
-    padding: theme.spacing(3),
-    transition: theme.transitions.create('margin', {
-      easing: theme.transitions.easing.sharp,
-      duration: theme.transitions.duration.leavingScreen,
-    }),
-    marginLeft: 0,
-    ...(open && {
-      transition: theme.transitions.create('margin', {
-        easing: theme.transitions.easing.easeOut,
-        duration: theme.transitions.duration.enteringScreen,
-      }),
-      marginLeft: drawerWidth,
-    }),
-  }),
-);
-
-const menuItems = [
-  { text: 'Home', icon: <HomeIcon />, path: '/' },
-  { text: 'Search Hotels', icon: <SearchIcon />, path: '/search' },
-  { text: 'Price Alerts', icon: <NotificationsIcon />, path: '/alerts' },
-  { text: 'Chat Assistant', icon: <ChatIcon />, path: '/chat' },
-];
-
-function Layout({ children }) {
-  const theme = useTheme();
+const Layout = ({ children }) => {
+  const [mobileOpen, setMobileOpen] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
-  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
-  const [drawerOpen, setDrawerOpen] = useState(!isMobile);
 
   const handleDrawerToggle = () => {
-    setDrawerOpen(!drawerOpen);
+    setMobileOpen(!mobileOpen);
   };
 
-  const handleNavigation = (path) => {
-    navigate(path);
-    if (isMobile) {
-      setDrawerOpen(false);
-    }
-  };
+  const menuItems = [
+    { text: 'Home', icon: <HomeIcon />, path: '/' },
+    { text: 'Alerts', icon: <NotificationsIcon />, path: '/alerts' },
+    { text: 'Analytics', icon: <AnalyticsIcon />, path: '/analytics' }
+  ];
 
   const drawer = (
-    <Box>
-      <Toolbar
-        sx={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'flex-end',
-          px: [1],
-        }}
-      >
-        {isMobile && (
-          <IconButton onClick={handleDrawerToggle}>
-            <ChevronLeftIcon />
-          </IconButton>
-        )}
+    <div>
+      <Toolbar>
+        <Typography variant="h6" noWrap component="div">
+          Hotel Tracker
+        </Typography>
       </Toolbar>
+      <Divider />
       <List>
         {menuItems.map((item) => (
           <ListItem
             button
             key={item.text}
-            onClick={() => handleNavigation(item.path)}
+            onClick={() => navigate(item.path)}
             selected={location.pathname === item.path}
-            sx={{
-              '&.Mui-selected': {
-                backgroundColor: theme.palette.primary.light,
-                color: theme.palette.primary.contrastText,
-                '& .MuiListItemIcon-root': {
-                  color: theme.palette.primary.contrastText,
-                },
-              },
-              '&:hover': {
-                backgroundColor: theme.palette.primary.light,
-                color: theme.palette.primary.contrastText,
-                '& .MuiListItemIcon-root': {
-                  color: theme.palette.primary.contrastText,
-                },
-              },
-            }}
           >
-            <ListItemIcon
-              sx={{
-                color: location.pathname === item.path
-                  ? theme.palette.primary.contrastText
-                  : theme.palette.text.primary,
-              }}
-            >
-              {item.icon}
-            </ListItemIcon>
+            <ListItemIcon>{item.icon}</ListItemIcon>
             <ListItemText primary={item.text} />
           </ListItem>
         ))}
       </List>
-    </Box>
+    </div>
   );
 
   return (
-    <Box sx={{ display: 'flex', minHeight: '100vh' }}>
+    <Box sx={{ display: 'flex' }}>
+      <CssBaseline />
       <AppBar
         position="fixed"
         sx={{
-          zIndex: theme.zIndex.drawer + 1,
-          transition: theme.transitions.create(['width', 'margin'], {
-            easing: theme.transitions.easing.sharp,
-            duration: theme.transitions.duration.leavingScreen,
-          }),
-          ...(drawerOpen && {
-            marginLeft: drawerWidth,
-            width: `calc(100% - ${drawerWidth}px)`,
-            transition: theme.transitions.create(['width', 'margin'], {
-              easing: theme.transitions.easing.sharp,
-              duration: theme.transitions.duration.enteringScreen,
-            }),
-          }),
+          width: { sm: `calc(100% - ${drawerWidth}px)` },
+          ml: { sm: `${drawerWidth}px` }
         }}
       >
         <Toolbar>
@@ -152,36 +78,64 @@ function Layout({ children }) {
             aria-label="open drawer"
             edge="start"
             onClick={handleDrawerToggle}
-            sx={{ mr: 2 }}
+            sx={{ mr: 2, display: { sm: 'none' } }}
           >
             <MenuIcon />
           </IconButton>
           <Typography variant="h6" noWrap component="div">
-            Hotel Price Tracker
+            {menuItems.find((item) => item.path === location.pathname)?.text ||
+              'Hotel Tracker'}
           </Typography>
         </Toolbar>
       </AppBar>
-      <Drawer
-        variant={isMobile ? 'temporary' : 'permanent'}
-        open={drawerOpen}
-        onClose={handleDrawerToggle}
+      <Box
+        component="nav"
+        sx={{ width: { sm: drawerWidth }, flexShrink: { sm: 0 } }}
+      >
+        <Drawer
+          variant="temporary"
+          open={mobileOpen}
+          onClose={handleDrawerToggle}
+          ModalProps={{
+            keepMounted: true // Better open performance on mobile.
+          }}
+          sx={{
+            display: { xs: 'block', sm: 'none' },
+            '& .MuiDrawer-paper': {
+              boxSizing: 'border-box',
+              width: drawerWidth
+            }
+          }}
+        >
+          {drawer}
+        </Drawer>
+        <Drawer
+          variant="permanent"
+          sx={{
+            display: { xs: 'none', sm: 'block' },
+            '& .MuiDrawer-paper': {
+              boxSizing: 'border-box',
+              width: drawerWidth
+            }
+          }}
+          open
+        >
+          {drawer}
+        </Drawer>
+      </Box>
+      <Box
+        component="main"
         sx={{
-          width: drawerWidth,
-          flexShrink: 0,
-          '& .MuiDrawer-paper': {
-            width: drawerWidth,
-            boxSizing: 'border-box',
-          },
+          flexGrow: 1,
+          p: 3,
+          width: { sm: `calc(100% - ${drawerWidth}px)` }
         }}
       >
-        {drawer}
-      </Drawer>
-      <Main open={drawerOpen}>
         <Toolbar />
-        <Box sx={{ p: 3 }}>{children}</Box>
-      </Main>
+        {children}
+      </Box>
     </Box>
   );
-}
+};
 
 export default Layout;
