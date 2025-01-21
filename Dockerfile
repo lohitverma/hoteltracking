@@ -35,13 +35,15 @@ FROM python:3.11-slim
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONPATH=/app:/app/backend \
-    VIRTUAL_ENV=/opt/venv
+    VIRTUAL_ENV=/opt/venv \
+    PORT=10000
 
 # Install runtime dependencies including PostgreSQL client
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
     libpq5 \
     postgresql-client \
+    netcat-traditional \
     && rm -rf /var/lib/apt/lists/*
 
 # Create non-root user
@@ -68,8 +70,12 @@ RUN chmod +x start.sh && \
 # Switch to non-root user
 USER appuser
 
-# Expose default port (will be overridden by PORT env var)
-EXPOSE 10000
+# Expose the port (will be overridden by PORT env var)
+EXPOSE ${PORT}
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
+    CMD nc -z localhost ${PORT} || exit 1
 
 # Start the application
 CMD ["./start.sh"]
