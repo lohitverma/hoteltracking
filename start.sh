@@ -22,27 +22,68 @@ get_db_params() {
 # Get database parameters
 read DB_USER DB_PASSWORD DB_HOST DB_PORT DB_NAME <<< $(get_db_params)
 
-echo "Waiting for database to be ready..."
-# Wait for database to be ready
+echo "Checking database connection..."
+
+# Function to check if we can connect to PostgreSQL server
+check_postgres() {
+    PGPASSWORD=$DB_PASSWORD psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "postgres" -c '\q' 2>/dev/null
+    return $?
+}
+
+# Function to check if database exists
+database_exists() {
+    PGPASSWORD=$DB_PASSWORD psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -lqt | cut -d \| -f 1 | grep -qw "$DB_NAME"
+    return $?
+}
+
+# Wait for PostgreSQL server to be ready
 MAX_RETRIES=60
 RETRY_INTERVAL=5
+RETRY_COUNT=0
+
+until check_postgres; do
+    RETRY_COUNT=$((RETRY_COUNT+1))
+    if [ $RETRY_COUNT -eq $MAX_RETRIES ]; then
+        echo "Error: Could not connect to PostgreSQL server after $MAX_RETRIES attempts"
+        echo "Database Host: $DB_HOST"
+        echo "Database Port: $DB_PORT"
+        echo "Database User: $DB_USER"
+        exit 1
+    fi
+    echo "PostgreSQL server is unavailable - sleeping for $RETRY_INTERVAL seconds (attempt $RETRY_COUNT/$MAX_RETRIES)"
+    sleep $RETRY_INTERVAL
+done
+
+echo "PostgreSQL server is ready!"
+
+# Create database if it doesn't exist
+if ! database_exists; then
+    echo "Database $DB_NAME does not exist. Creating..."
+    PGPASSWORD=$DB_PASSWORD createdb -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" "$DB_NAME"
+    echo "Database $DB_NAME created successfully!"
+else
+    echo "Database $DB_NAME already exists."
+fi
+
+# Now wait for the specific database to be ready
+echo "Checking database connection..."
 RETRY_COUNT=0
 
 until PGPASSWORD=$DB_PASSWORD psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -c '\q' 2>/dev/null; do
     RETRY_COUNT=$((RETRY_COUNT+1))
     if [ $RETRY_COUNT -eq $MAX_RETRIES ]; then
-        echo "Error: Could not connect to PostgreSQL after $MAX_RETRIES attempts"
+        echo "Error: Could not connect to database $DB_NAME after $MAX_RETRIES attempts"
         echo "Database Host: $DB_HOST"
         echo "Database Port: $DB_PORT"
         echo "Database Name: $DB_NAME"
         echo "Database User: $DB_USER"
         exit 1
     fi
-    echo "PostgreSQL is unavailable - sleeping for $RETRY_INTERVAL seconds (attempt $RETRY_COUNT/$MAX_RETRIES)"
+    echo "Database $DB_NAME is unavailable - sleeping for $RETRY_INTERVAL seconds (attempt $RETRY_COUNT/$MAX_RETRIES)"
     sleep $RETRY_INTERVAL
 done
 
-echo "PostgreSQL is ready!"
+echo "Database $DB_NAME is ready!"
 
 # Initialize Alembic if not already initialized
 if [ ! -d "migrations" ]; then

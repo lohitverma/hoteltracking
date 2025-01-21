@@ -38,8 +38,9 @@ ENV PYTHONUNBUFFERED=1 \
     PORT=10000 \
     VIRTUAL_ENV=/opt/venv
 
-# Install runtime dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
+# Install runtime dependencies including PostgreSQL client
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
     libpq5 \
     postgresql-client \
     && rm -rf /var/lib/apt/lists/*
