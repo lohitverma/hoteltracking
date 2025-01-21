@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { ThemeProvider } from '@mui/material/styles';
 import { CssBaseline } from '@mui/material';
 import { SnackbarProvider } from 'notistack';
@@ -27,9 +27,10 @@ function App() {
             <Router>
               <Layout>
                 <Routes>
-                  <Route path="/" element={<Home />} />
-                  <Route path="/search" element={<HotelSearch />} />
+                  {/* Redirect root to page-city */}
+                  <Route path="/" element={<Navigate to="/page-city" replace />} />
                   <Route path="/page-city" element={<PageCity />} />
+                  <Route path="/search" element={<HotelSearch />} />
                 </Routes>
               </Layout>
             </Router>
