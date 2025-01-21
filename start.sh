@@ -6,6 +6,10 @@ echo "Starting application initialization..."
 # Ensure we're in the right directory
 cd "$(dirname "$0")"
 
+# Add backend directory to PYTHONPATH
+export PYTHONPATH="${PYTHONPATH:-.}:$(pwd):$(pwd)/backend"
+echo "PYTHONPATH set to: $PYTHONPATH"
+
 # Function to parse DATABASE_URL
 parse_db_url() {
     # Try URLs in order: internal -> external -> fallback

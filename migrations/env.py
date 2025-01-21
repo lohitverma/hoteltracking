@@ -1,16 +1,14 @@
 from logging.config import fileConfig
-
 from sqlalchemy import engine_from_config
 from sqlalchemy import pool
-
 from alembic import context
-
 import os
 import sys
 from dotenv import load_dotenv
 
 # Add the parent directory to sys.path
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
+sys.path.append(os.path.join(os.path.dirname(os.path.dirname(__file__)), "backend"))
 
 # Load environment variables from .env file
 load_dotenv()
@@ -25,10 +23,16 @@ if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
 # Import all models here
-from models import Base
+try:
+    from backend.models import Base
+except ImportError:
+    try:
+        from models import Base
+    except ImportError:
+        raise ImportError("Could not import Base from either backend.models or models")
+
 target_metadata = Base.metadata
 
-# Get database URL from environment variables
 def get_url():
     # Try URLs in order: internal -> external -> fallback
     if os.getenv("INTERNAL_DATABASE_URL"):
