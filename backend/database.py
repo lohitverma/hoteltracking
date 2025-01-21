@@ -137,9 +137,9 @@ def create_db_engine(max_retries=5, retry_interval=5):
     # Get database parameters
     db_user = os.getenv("POSTGRES_USER", "hoteltracker_user")
     db_password = os.getenv("POSTGRES_PASSWORD")
-    db_host = os.getenv("POSTGRES_HOST", "dpg-cu7failds78s73arp6j0-a.oregon-postgres.render.com")
+    db_host = os.getenv("POSTGRES_HOST", "dpg-cu7failds78s73arp6j0-a")
     db_port = os.getenv("POSTGRES_PORT", "5432")
-    db_name = os.getenv("POSTGRES_DB", "hoteltracker")
+    db_name = os.getenv("POSTGRES_DB", "hoteltracker")  # Using correct database name
     
     # Log configuration (without sensitive data)
     logger.info(f"Database Configuration:")
@@ -148,45 +148,33 @@ def create_db_engine(max_retries=5, retry_interval=5):
     logger.info(f"Database: {db_name}")
     logger.info(f"User: {db_user}")
     
-    # Base URL without SSL mode
-    base_url = f"postgresql://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}"
+    # Use the exact internal URL format from Render.com
+    database_url = os.getenv("DATABASE_URL", f"postgresql://{db_user}:{db_password}@{db_host}/{db_name}")
     
-    # Try different SSL modes
-    ssl_modes = ['require', 'verify-full', 'verify-ca', 'prefer', 'disable']
+    logger.info("Attempting database connection...")
     
-    for ssl_mode in ssl_modes:
-        try:
-            logger.info(f"Attempting connection with sslmode={ssl_mode}")
-            
-            # Create the engine with current SSL mode
-            engine = create_engine(
-                f"{base_url}?sslmode={ssl_mode}",
-                pool_size=1,
-                max_overflow=2,
-                pool_timeout=30,
-                connect_args={
-                    'connect_timeout': 10,
-                    'application_name': 'hoteltracker',
-                    'keepalives': 1,
-                    'keepalives_idle': 30,
-                    'keepalives_interval': 10,
-                    'keepalives_count': 5
-                }
-            )
-            
-            # Test connection
-            with engine.connect() as connection:
-                # Test basic connectivity
-                connection.execute("SELECT 1")
-                logger.info(f"Connection successful with sslmode={ssl_mode}")
-                return engine
-                
-        except Exception as e:
-            logger.error(f"Connection failed with sslmode={ssl_mode}: {str(e)}")
-            continue
+    # Create the engine with specific configuration for Render.com
+    engine = create_engine(
+        database_url,
+        pool_size=1,
+        max_overflow=2,
+        pool_timeout=30,
+        connect_args={
+            'connect_timeout': 10,
+            'application_name': 'hoteltracker',
+            'sslmode': 'require'
+        }
+    )
     
-    # If we get here, all SSL modes failed
-    raise Exception("Failed to connect with any SSL mode")
+    # Test connection
+    try:
+        with engine.connect() as connection:
+            connection.execute("SELECT 1")
+            logger.info("Database connection successful!")
+            return engine
+    except Exception as e:
+        logger.error(f"Database connection failed: {str(e)}")
+        raise
 
 # Initialize engine with retry logic
 try:
