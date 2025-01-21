@@ -21,6 +21,31 @@ import {
 } from '@mui/icons-material';
 import { format } from 'date-fns';
 
+// Mock data for development
+const mockHotelData = [
+  {
+    id: 1,
+    name: "Budget Inn",
+    rating: 2,
+    priceHistory: Array(10).fill(null).map((_, i) => ({
+      amount: Math.floor(Math.random() * (120 - 80) + 80),
+      available: Math.random() > 0.2,
+      changed: Math.random() > 0.7
+    }))
+  },
+  {
+    id: 2,
+    name: "Travelers Lodge",
+    rating: 2,
+    priceHistory: Array(10).fill(null).map((_, i) => ({
+      amount: Math.floor(Math.random() * (130 - 90) + 90),
+      available: Math.random() > 0.2,
+      changed: Math.random() > 0.7
+    }))
+  },
+  // Add more mock hotels here
+];
+
 const HOURS_TO_SHOW = 10;
 const UPDATE_INTERVAL = 60000; // 1 minute
 
@@ -43,7 +68,13 @@ const RealTimeHotelChart = () => {
 
   const fetchHotelData = async () => {
     try {
-      // Replace with your actual API endpoint
+      // For development, use mock data
+      setHotelData(mockHotelData);
+      setLastUpdate(new Date());
+      setLoading(false);
+      
+      // TODO: Replace with actual API call when backend is ready
+      /*
       const response = await fetch(`${import.meta.env.VITE_API_URL}/api/hotels/page-city`, {
         method: 'GET',
         headers: {
@@ -58,6 +89,7 @@ const RealTimeHotelChart = () => {
       const data = await response.json();
       setHotelData(data);
       setLastUpdate(new Date());
+      */
     } catch (error) {
       console.error('Error fetching hotel data:', error);
     } finally {
@@ -148,7 +180,7 @@ const RealTimeHotelChart = () => {
                       <Box>
                         <Typography variant="body2">{hotel.name}</Typography>
                         <Typography variant="caption">
-                          Rating: {hotel.rating} ⭐
+                          Rating: {hotel.rating} 
                         </Typography>
                       </Box>
                     }

@@ -5,12 +5,12 @@ import { CssBaseline } from '@mui/material';
 import { SnackbarProvider } from 'notistack';
 import { LocalizationProvider } from '@mui/x-date-pickers';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
-import theme from './theme';
-import ErrorBoundary from './utils/errorBoundary';
-import Layout from './components/Layout';
-import Home from './pages/Home';
-import HotelSearch from './pages/HotelSearch';
-import PageCity from './pages/PageCity';
+import theme from './theme.jsx';
+import ErrorBoundary from './utils/errorBoundary.jsx';
+import Layout from './components/Layout.jsx';
+import Home from './pages/Home.jsx';
+import HotelSearch from './pages/HotelSearch.jsx';
+import PageCity from './pages/PageCity.jsx';
 
 function App() {
   return (
