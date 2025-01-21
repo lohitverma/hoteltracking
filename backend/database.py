@@ -10,6 +10,7 @@ import subprocess
 import sys
 from datadog import statsd
 from ddtrace import tracer
+from sqlalchemy.engine.url import make_url
 
 load_dotenv()
 
@@ -94,126 +95,129 @@ def parse_db_url(url):
         return None
 
 def get_database_url():
-    """Get and validate database URL"""
-    # Get individual components
-    db_user = os.getenv("POSTGRES_USER", "hoteltracker_user")
-    db_password = os.getenv("POSTGRES_PASSWORD")
-    db_host = os.getenv("POSTGRES_HOST", "dpg-cu7failds78s73arp6j0-a.oregon-postgres.render.com")
-    db_port = os.getenv("POSTGRES_PORT", "5432")
-    db_name = os.getenv("POSTGRES_DB", "hoteltracker")
+    """Get the appropriate database URL based on environment"""
+    # Try internal URL first (faster within Render's network)
+    internal_url = os.getenv("INTERNAL_DATABASE_URL")
+    external_url = os.getenv("EXTERNAL_DATABASE_URL")
+    fallback_url = os.getenv("DATABASE_URL")  # For backward compatibility
     
-    # Log configuration (without sensitive data)
-    logger.info(f"Database Configuration:")
-    logger.info(f"Host: {db_host}")
-    logger.info(f"Port: {db_port}")
-    logger.info(f"Database: {db_name}")
-    logger.info(f"User: {db_user}")
+    urls_to_try = []
     
-    # Construct database URL
-    database_url = f"postgresql://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}"
-    
-    # Test DNS resolution
-    try:
-        ip_address = socket.gethostbyname(db_host)
-        logger.info(f"Successfully resolved {db_host} to {ip_address}")
-    except socket.gaierror as e:
-        logger.error(f"DNS resolution failed for {db_host}: {str(e)}")
-    
-    # Test TCP connection
-    try:
-        sock = socket.create_connection((db_host, int(db_port)), timeout=5)
-        sock.close()
-        logger.info(f"TCP connection test successful to {db_host}:{db_port}")
-    except Exception as e:
-        logger.error(f"TCP connection test failed: {str(e)}")
-    
-    return database_url
-
-def create_db_engine(max_retries=5, retry_interval=5):
-    """Create database engine with retry logic"""
-    # Use external database URL for connecting from outside Render's network
-    database_url = os.getenv(
-        "DATABASE_URL", 
-        "postgresql://hoteltracker_user:VoKj4Xa7xyG0DhH2Fa0UW48QFd7gGZme@dpg-cu7failds78s73arp6j0-a.oregon-postgres.render.com/hoteltracker"
-    )
-    
-    if not database_url:
-        raise ValueError("DATABASE_URL environment variable is not set")
-    
-    logger.info("Initializing database connection...")
-    
-    # Extract connection info for logging (safely)
-    try:
-        # Parse URL without exposing credentials
-        if "@" in database_url:
-            user_part = database_url.split("@")[0].split("://")[1].split(":")[0]
-            host_part = database_url.split("@")[1].split("/")[0]
-            db_part = database_url.split("/")[-1]
-            logger.info(f"Connecting to database:")
-            logger.info(f"User: {user_part}")
-            logger.info(f"Host: {host_part}")
-            logger.info(f"Database: {db_part}")
-        else:
-            logger.warning("DATABASE_URL format is not standard")
-    except Exception as e:
-        logger.error(f"Error parsing DATABASE_URL: {str(e)}")
-    
-    try:
-        logger.info("Creating database engine...")
-        engine = create_engine(
-            database_url,
-            pool_size=1,
-            max_overflow=2,
-            pool_timeout=30,
-            connect_args={
-                'connect_timeout': 10,
-                'application_name': 'hoteltracker',
-                'sslmode': 'require',
-                'keepalives': 1,
-                'keepalives_idle': 30,
-                'keepalives_interval': 10,
-                'keepalives_count': 5
-            }
-        )
+    if internal_url:
+        urls_to_try.append(("internal", internal_url))
+    if external_url:
+        urls_to_try.append(("external", external_url))
+    if fallback_url:
+        urls_to_try.append(("fallback", fallback_url))
         
-        # Test connection and get server version
+    if not urls_to_try:
+        raise ValueError(
+            "No database URL configured. Please set either INTERNAL_DATABASE_URL, "
+            "EXTERNAL_DATABASE_URL, or DATABASE_URL environment variable."
+        )
+    
+    return urls_to_try
+
+def test_connection(engine):
+    """Test database connection and return version info"""
+    try:
         with engine.connect() as conn:
             version = conn.execute("SELECT version();").scalar()
-            logger.info(f"Successfully connected to PostgreSQL")
-            logger.info(f"Server version: {version}")
-            
-            # Test database permissions
             user = conn.execute("SELECT current_user;").scalar()
             database = conn.execute("SELECT current_database();").scalar()
-            logger.info(f"Connected as user: {user}")
-            logger.info(f"Connected to database: {database}")
-            
-            return engine
-            
+            return True, {
+                "version": version,
+                "user": user,
+                "database": database
+            }
     except Exception as e:
-        error_msg = str(e)
-        logger.error("Database connection failed!")
-        logger.error(f"Error: {error_msg}")
+        return False, str(e)
+
+def create_db_engine(max_retries=5, retry_interval=5):
+    """Create database engine with retry logic and URL fallback"""
+    last_exception = None
+    urls_to_try = get_database_url()
+    
+    for url_type, database_url in urls_to_try:
+        logger.info(f"Attempting connection using {url_type} URL...")
         
-        if "could not connect to server" in error_msg:
-            logger.error("Could not reach the database server. Please check:")
-            logger.error("1. The database service is running")
-            logger.error("2. The host is correct")
-            logger.error("3. Network connectivity is available")
-        elif "password authentication failed" in error_msg:
-            logger.error("Authentication failed. Please check:")
-            logger.error("1. The database username is correct")
-            logger.error("2. The database password is correct")
-        elif "database" in error_msg and "does not exist" in error_msg:
-            logger.error("Database does not exist. Please check:")
-            logger.error("1. The database name is correct")
-            logger.error("2. The database has been created")
-        elif "SSL SYSCALL error" in error_msg:
-            logger.error("SSL connection error. Please check:")
-            logger.error("1. SSL is properly configured")
-            logger.error("2. The connection is not being blocked by a firewall")
+        # Parse URL for logging (without exposing credentials)
+        try:
+            parsed_url = make_url(database_url)
+            logger.info(f"Connection info ({url_type}):")
+            logger.info(f"User: {parsed_url.username}")
+            logger.info(f"Host: {parsed_url.host}")
+            logger.info(f"Database: {parsed_url.database}")
+        except Exception as e:
+            logger.error(f"Error parsing {url_type} URL: {str(e)}")
+            continue
         
-        raise
+        # Try to connect with retries
+        retry_count = 0
+        while retry_count < max_retries:
+            try:
+                logger.info(f"Creating database engine (attempt {retry_count + 1}/{max_retries})...")
+                engine = create_engine(
+                    database_url,
+                    pool_size=1,
+                    max_overflow=2,
+                    pool_timeout=30,
+                    connect_args={
+                        'connect_timeout': 10,
+                        'application_name': 'hoteltracker',
+                        'sslmode': 'require',
+                        'keepalives': 1,
+                        'keepalives_idle': 30,
+                        'keepalives_interval': 10,
+                        'keepalives_count': 5
+                    }
+                )
+                
+                # Test the connection
+                success, info = test_connection(engine)
+                if success:
+                    logger.info(f"Successfully connected using {url_type} URL!")
+                    logger.info(f"PostgreSQL version: {info['version']}")
+                    logger.info(f"Connected as: {info['user']}")
+                    logger.info(f"Database: {info['database']}")
+                    return engine
+                    
+            except Exception as e:
+                last_exception = e
+                error_msg = str(e)
+                logger.warning(f"Connection attempt {retry_count + 1} failed: {error_msg}")
+                
+                if "password authentication failed" in error_msg:
+                    logger.error(f"Authentication failed for {url_type} URL")
+                    break  # Don't retry auth failures
+                    
+                retry_count += 1
+                if retry_count < max_retries:
+                    logger.info(f"Retrying in {retry_interval} seconds...")
+                    time.sleep(retry_interval)
+                    
+        logger.error(f"All attempts failed for {url_type} URL")
+    
+    # If we get here, all URLs failed
+    error_msg = str(last_exception) if last_exception else "Unknown error"
+    logger.error("All database connection attempts failed!")
+    logger.error(f"Last error: {error_msg}")
+    
+    if "could not connect to server" in error_msg:
+        logger.error("Could not reach the database server. Please check:")
+        logger.error("1. The database service is running")
+        logger.error("2. The host is correct")
+        logger.error("3. Network connectivity is available")
+    elif "password authentication failed" in error_msg:
+        logger.error("Authentication failed. Please check:")
+        logger.error("1. The database username is correct")
+        logger.error("2. The database password is correct")
+    elif "SSL SYSCALL error" in error_msg:
+        logger.error("SSL connection error. Please check:")
+        logger.error("1. SSL is properly configured")
+        logger.error("2. The connection is not being blocked by a firewall")
+    
+    raise Exception("Failed to connect to database using any available URL")
 
 # Initialize engine with retry logic
 try:

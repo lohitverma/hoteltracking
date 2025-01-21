@@ -5,10 +5,19 @@ echo "Starting application initialization..."
 
 # Function to parse DATABASE_URL
 parse_db_url() {
-    if [ -z "$DATABASE_URL" ]; then
-        # Use default external URL if not set
-        DATABASE_URL="postgresql://hoteltracker_user:VoKj4Xa7xyG0DhH2Fa0UW48QFd7gGZme@dpg-cu7failds78s73arp6j0-a.oregon-postgres.render.com/hoteltracker"
-        echo "Using default external DATABASE_URL"
+    # Try URLs in order: internal -> external -> fallback
+    if [ -n "$INTERNAL_DATABASE_URL" ]; then
+        DATABASE_URL="$INTERNAL_DATABASE_URL"
+        echo "Using internal DATABASE_URL"
+    elif [ -n "$EXTERNAL_DATABASE_URL" ]; then
+        DATABASE_URL="$EXTERNAL_DATABASE_URL"
+        echo "Using external DATABASE_URL"
+    elif [ -z "$DATABASE_URL" ]; then
+        echo "ERROR: No database URL configured"
+        echo "Please set either INTERNAL_DATABASE_URL, EXTERNAL_DATABASE_URL, or DATABASE_URL"
+        exit 1
+    else
+        echo "Using fallback DATABASE_URL"
     fi
     
     echo "Parsing DATABASE_URL..."
