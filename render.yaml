@@ -60,28 +60,36 @@ services:
 
   - type: web
     name: hotel-tracker-frontend
-    env: static
-    buildCommand: cd frontend && npm install && npm run build
-    staticPublishPath: ./frontend/dist
+    env: node
+    buildCommand: |
+      cd frontend
+      npm install
+      npm run build
+    startCommand: |
+      cd frontend
+      npm run preview
+    region: ohio
+    plan: starter
+    healthCheckPath: /
+    port: 3000
     domains:
       - app.hoteltracker.org
-    headers:
-      - path: /*
-        name: Cache-Control
-        value: no-cache
-    routes:
-      - type: redirect
-        source: /api/*
-        destination: https://api.hoteltracker.org/*
-        status: 301
-      - type: rewrite
-        source: /*
-        destination: /index.html
     envVars:
+      - key: NODE_VERSION
+        value: 18.x
       - key: VITE_API_URL
         value: https://api.hoteltracker.org
-      - key: NODE_VERSION
-        value: 18.17.0
+    autoDeploy: true
+    headers:
+      - path: /*
+        name: Strict-Transport-Security
+        value: max-age=31536000; includeSubDomains
+      - path: /*
+        name: X-Frame-Options
+        value: DENY
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff
 
   - type: redis
     name: hotel-tracker-redis
