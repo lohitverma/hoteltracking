@@ -135,46 +135,75 @@ def create_db_engine(max_retries=5, retry_interval=5):
     if not database_url:
         raise ValueError("DATABASE_URL environment variable is not set")
     
-    # Parse the URL for logging (without exposing password)
+    logger.info("Initializing database connection...")
+    
+    # Extract connection info for logging (safely)
     try:
-        parts = database_url.split("@")
-        if len(parts) == 2:
-            user_part = parts[0].split("://")[1].split(":")[0]
-            host_part = parts[1]
-            logger.info(f"Database connection info:")
+        # Parse URL without exposing credentials
+        if "@" in database_url:
+            user_part = database_url.split("@")[0].split("://")[1].split(":")[0]
+            host_part = database_url.split("@")[1].split("/")[0]
+            db_part = database_url.split("/")[-1]
+            logger.info(f"Connecting to database:")
             logger.info(f"User: {user_part}")
             logger.info(f"Host: {host_part}")
+            logger.info(f"Database: {db_part}")
+        else:
+            logger.warning("DATABASE_URL format is not standard")
     except Exception as e:
         logger.error(f"Error parsing DATABASE_URL: {str(e)}")
     
-    logger.info("Creating database engine...")
-    
-    # Create the engine with specific configuration for Render.com
-    engine = create_engine(
-        database_url,
-        pool_size=1,
-        max_overflow=2,
-        pool_timeout=30,
-        connect_args={
-            'connect_timeout': 10,
-            'application_name': 'hoteltracker',
-            'sslmode': 'require'
-        }
-    )
-    
-    # Test connection
     try:
-        with engine.connect() as connection:
-            result = connection.execute("SELECT version();").scalar()
-            logger.info(f"Database connection successful! PostgreSQL version: {result}")
+        logger.info("Creating database engine...")
+        engine = create_engine(
+            database_url,
+            pool_size=1,
+            max_overflow=2,
+            pool_timeout=30,
+            connect_args={
+                'connect_timeout': 10,
+                'application_name': 'hoteltracker',
+                'sslmode': 'require',
+                'keepalives': 1,
+                'keepalives_idle': 30,
+                'keepalives_interval': 10,
+                'keepalives_count': 5
+            }
+        )
+        
+        # Test connection and get server version
+        with engine.connect() as conn:
+            version = conn.execute("SELECT version();").scalar()
+            logger.info(f"Successfully connected to PostgreSQL")
+            logger.info(f"Server version: {version}")
+            
+            # Test database permissions
+            user = conn.execute("SELECT current_user;").scalar()
+            database = conn.execute("SELECT current_database();").scalar()
+            logger.info(f"Connected as user: {user}")
+            logger.info(f"Connected to database: {database}")
+            
             return engine
+            
     except Exception as e:
-        logger.error(f"Database connection failed with error: {str(e)}")
-        logger.error("Please check:")
-        logger.error("1. Database URL format is correct")
-        logger.error("2. Database service is running")
-        logger.error("3. Network connectivity is available")
-        logger.error("4. Database credentials are correct")
+        error_msg = str(e)
+        logger.error("Database connection failed!")
+        logger.error(f"Error: {error_msg}")
+        
+        if "could not connect to server" in error_msg:
+            logger.error("Could not reach the database server. Please check:")
+            logger.error("1. The database service is running")
+            logger.error("2. The host is correct")
+            logger.error("3. Network connectivity is available")
+        elif "password authentication failed" in error_msg:
+            logger.error("Authentication failed. Please check:")
+            logger.error("1. The database username is correct")
+            logger.error("2. The database password is correct")
+        elif "database" in error_msg and "does not exist" in error_msg:
+            logger.error("Database does not exist. Please check:")
+            logger.error("1. The database name is correct")
+            logger.error("2. The database has been created")
+        
         raise
 
 # Initialize engine with retry logic
