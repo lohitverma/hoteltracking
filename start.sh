@@ -26,13 +26,13 @@ echo "Checking database connection..."
 
 # Function to check if we can connect to PostgreSQL server
 check_postgres() {
-    PGPASSWORD=$DB_PASSWORD psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "postgres" -c '\q' 2>/dev/null
+    PGPASSWORD=$DB_PASSWORD psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "postgres" -c '\q' "sslmode=require" 2>/dev/null
     return $?
 }
 
 # Function to check if database exists
 database_exists() {
-    PGPASSWORD=$DB_PASSWORD psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -lqt | cut -d \| -f 1 | grep -qw "$DB_NAME"
+    PGPASSWORD=$DB_PASSWORD psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -lqt "sslmode=require" | cut -d \| -f 1 | grep -qw "$DB_NAME"
     return $?
 }
 
@@ -41,6 +41,10 @@ MAX_RETRIES=60
 RETRY_INTERVAL=5
 RETRY_COUNT=0
 
+echo "Testing network connectivity..."
+nc -zv "$DB_HOST" "$DB_PORT" 2>&1
+echo "Network test complete."
+
 until check_postgres; do
     RETRY_COUNT=$((RETRY_COUNT+1))
     if [ $RETRY_COUNT -eq $MAX_RETRIES ]; then
@@ -48,6 +52,8 @@ until check_postgres; do
         echo "Database Host: $DB_HOST"
         echo "Database Port: $DB_PORT"
         echo "Database User: $DB_USER"
+        echo "Environment Variables:"
+        env | grep -i "database\|postgres" | grep -v "password"
         exit 1
     fi
     echo "PostgreSQL server is unavailable - sleeping for $RETRY_INTERVAL seconds (attempt $RETRY_COUNT/$MAX_RETRIES)"
@@ -69,7 +75,7 @@ fi
 echo "Checking database connection..."
 RETRY_COUNT=0
 
-until PGPASSWORD=$DB_PASSWORD psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -c '\q' 2>/dev/null; do
+until PGPASSWORD=$DB_PASSWORD psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -c '\q' "sslmode=require" 2>/dev/null; do
     RETRY_COUNT=$((RETRY_COUNT+1))
     if [ $RETRY_COUNT -eq $MAX_RETRIES ]; then
         echo "Error: Could not connect to database $DB_NAME after $MAX_RETRIES attempts"
@@ -77,6 +83,8 @@ until PGPASSWORD=$DB_PASSWORD psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d 
         echo "Database Port: $DB_PORT"
         echo "Database Name: $DB_NAME"
         echo "Database User: $DB_USER"
+        echo "Environment Variables:"
+        env | grep -i "database\|postgres" | grep -v "password"
         exit 1
     fi
     echo "Database $DB_NAME is unavailable - sleeping for $RETRY_INTERVAL seconds (attempt $RETRY_COUNT/$MAX_RETRIES)"
