@@ -4,19 +4,19 @@ const theme = createTheme({
   palette: {
     mode: 'light',
     primary: {
-      main: '#2196f3',
-      light: '#64b5f6',
-      dark: '#1976d2',
+      main: '#1976d2',
+      light: '#42a5f5',
+      dark: '#1565c0',
       contrastText: '#ffffff',
     },
     secondary: {
-      main: '#f50057',
-      light: '#ff4081',
-      dark: '#c51162',
+      main: '#9c27b0',
+      light: '#ba68c8',
+      dark: '#7b1fa2',
       contrastText: '#ffffff',
     },
     background: {
-      default: '#f8fafc',
+      default: '#f5f5f5',
       paper: '#ffffff',
     },
     success: {
@@ -143,6 +143,7 @@ const theme = createTheme({
     MuiButton: {
       styleOverrides: {
         root: {
+          textTransform: 'none',
           borderRadius: 8,
           padding: '8px 16px',
           transition: 'all 0.2s ease-in-out',
@@ -211,7 +212,7 @@ const theme = createTheme({
     MuiPaper: {
       styleOverrides: {
         root: {
-          borderRadius: 16,
+          borderRadius: 12,
         },
       },
     },

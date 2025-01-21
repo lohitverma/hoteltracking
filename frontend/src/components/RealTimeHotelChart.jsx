@@ -43,7 +43,86 @@ const mockHotelData = [
       changed: Math.random() > 0.7
     }))
   },
-  // Add more mock hotels here
+  {
+    id: 3,
+    name: "Lake Powell Inn",
+    rating: 2,
+    priceHistory: Array(10).fill(null).map((_, i) => ({
+      amount: Math.floor(Math.random() * (140 - 95) + 95),
+      available: Math.random() > 0.2,
+      changed: Math.random() > 0.7
+    }))
+  },
+  {
+    id: 4,
+    name: "Desert View Motel",
+    rating: 2,
+    priceHistory: Array(10).fill(null).map((_, i) => ({
+      amount: Math.floor(Math.random() * (110 - 75) + 75),
+      available: Math.random() > 0.2,
+      changed: Math.random() > 0.7
+    }))
+  },
+  {
+    id: 5,
+    name: "Canyon Lodge",
+    rating: 2,
+    priceHistory: Array(10).fill(null).map((_, i) => ({
+      amount: Math.floor(Math.random() * (125 - 85) + 85),
+      available: Math.random() > 0.2,
+      changed: Math.random() > 0.7
+    }))
+  },
+  {
+    id: 6,
+    name: "Arizona Motor Inn",
+    rating: 2,
+    priceHistory: Array(10).fill(null).map((_, i) => ({
+      amount: Math.floor(Math.random() * (115 - 80) + 80),
+      available: Math.random() > 0.2,
+      changed: Math.random() > 0.7
+    }))
+  },
+  {
+    id: 7,
+    name: "Page View Hotel",
+    rating: 2,
+    priceHistory: Array(10).fill(null).map((_, i) => ({
+      amount: Math.floor(Math.random() * (135 - 95) + 95),
+      available: Math.random() > 0.2,
+      changed: Math.random() > 0.7
+    }))
+  },
+  {
+    id: 8,
+    name: "Antelope Inn",
+    rating: 2,
+    priceHistory: Array(10).fill(null).map((_, i) => ({
+      amount: Math.floor(Math.random() * (120 - 85) + 85),
+      available: Math.random() > 0.2,
+      changed: Math.random() > 0.7
+    }))
+  },
+  {
+    id: 9,
+    name: "Glen Canyon Motel",
+    rating: 2,
+    priceHistory: Array(10).fill(null).map((_, i) => ({
+      amount: Math.floor(Math.random() * (125 - 90) + 90),
+      available: Math.random() > 0.2,
+      changed: Math.random() > 0.7
+    }))
+  },
+  {
+    id: 10,
+    name: "Powell Place Inn",
+    rating: 2,
+    priceHistory: Array(10).fill(null).map((_, i) => ({
+      amount: Math.floor(Math.random() * (130 - 85) + 85),
+      available: Math.random() > 0.2,
+      changed: Math.random() > 0.7
+    }))
+  }
 ];
 
 const HOURS_TO_SHOW = 10;
