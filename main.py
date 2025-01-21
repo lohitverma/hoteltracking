@@ -1,13 +1,10 @@
 import os
 import sys
 import logging
-import socket
-import psutil
 from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from backend.database import SessionLocal, engine, Base, wait_for_db
-import uvicorn
+from backend.database import SessionLocal, engine, Base
 
 # Configure logging
 logging.basicConfig(
@@ -27,7 +24,7 @@ app = FastAPI(
 # Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # In production, replace with specific origins
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -58,7 +55,6 @@ async def root():
         }
     })
 
-# Health check endpoint
 @app.get("/health")
 async def health_check():
     """Health check endpoint that verifies database connection."""
@@ -79,24 +75,3 @@ async def health_check():
             "version": "1.0.0",
             "database": str(e)
         }
-
-if __name__ == "__main__":
-    try:
-        # Get port
-        port = int(os.environ.get("PORT", 10000))
-        logger.info(f"Starting server on port {port}")
-        
-        # Start server
-        uvicorn.run(
-            "main:app",
-            host="0.0.0.0",
-            port=port,
-            reload=False,
-            access_log=True,
-            log_level="info",
-            proxy_headers=True,
-            forwarded_allow_ips="*"
-        )
-    except Exception as e:
-        logger.error(f"Failed to start server: {e}")
-        sys.exit(1)

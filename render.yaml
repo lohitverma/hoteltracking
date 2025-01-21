@@ -8,7 +8,7 @@ services:
       pip install -r requirements.txt
     startCommand: |
       . venv/bin/activate
-      python run.py
+      python server.py
     region: ohio
     plan: starter
     healthCheckPath: /health
@@ -36,6 +36,8 @@ services:
         value: "1"
       - key: PYTHONDONTWRITEBYTECODE
         value: "1"
+      - key: PYTHONPATH
+        value: "."
     autoDeploy: true
     headers:
       - path: /*
