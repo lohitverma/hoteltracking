@@ -95,27 +95,33 @@ def parse_db_url(url):
 
 def get_database_url():
     """Get and validate database URL"""
-    # First try to get the internal URL (Render.com specific)
+    # Get database URLs with distinct key names
     internal_database_url = os.getenv("RENDER_INTERNAL_DATABASE_URL")
     database_url = os.getenv("DATABASE_URL")
+    
+    # Get the database keys with distinct names
+    internal_key = os.getenv("RENDER_INTERNAL_DB_KEY")
+    external_key = os.getenv("RENDER_EXTERNAL_DB_KEY")
     
     # Log available environment variables (without sensitive data)
     env_vars = {
         'DATABASE_URL exists': bool(database_url),
         'RENDER_INTERNAL_DATABASE_URL exists': bool(internal_database_url),
+        'Internal DB Key exists': bool(internal_key),
+        'External DB Key exists': bool(external_key),
         'RENDER_EXTERNAL_HOSTNAME': os.getenv('RENDER_EXTERNAL_HOSTNAME'),
         'RENDER_SERVICE_NAME': os.getenv('RENDER_SERVICE_NAME'),
         'RENDER_SERVICE_TYPE': os.getenv('RENDER_SERVICE_TYPE')
     }
     logger.info(f"Environment configuration: {env_vars}")
     
-    if internal_database_url:
-        logger.info("Using RENDER_INTERNAL_DATABASE_URL for Render.com internal networking")
+    if internal_database_url and internal_key:
+        logger.info("Using RENDER_INTERNAL_DATABASE_URL with internal key")
         database_url = internal_database_url
-    elif database_url:
-        logger.info("Using external DATABASE_URL")
+    elif database_url and external_key:
+        logger.info("Using external DATABASE_URL with external key")
     else:
-        logger.warning("No database URL found, using individual parameters")
+        logger.warning("No database URL or key found, using individual parameters")
         # Construct from individual components
         db_user = os.getenv("POSTGRES_USER", "postgres")
         db_password = os.getenv("POSTGRES_PASSWORD", "postgres")
@@ -127,7 +133,7 @@ def get_database_url():
         logger.info(f"Using constructed URL with host: {db_host}:{db_port}/{db_name}")
     
     # Handle URL format
-    if database_url.startswith("postgres://"):
+    if database_url and database_url.startswith("postgres://"):
         database_url = database_url.replace("postgres://", "postgresql://", 1)
         logger.info("Converted postgres:// to postgresql:// in URL")
     

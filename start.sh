@@ -6,12 +6,15 @@ echo "Starting application initialization..."
 # Function to get database connection parameters from DATABASE_URL or individual vars
 get_db_params() {
     local url=""
-    if [ ! -z "$RENDER_INTERNAL_DATABASE_URL" ]; then
+    
+    # Check for internal connection with key
+    if [ ! -z "$RENDER_INTERNAL_DATABASE_URL" ] && [ ! -z "$RENDER_INTERNAL_DB_KEY" ]; then
         url="$RENDER_INTERNAL_DATABASE_URL"
-        echo "Using RENDER_INTERNAL_DATABASE_URL"
-    elif [ ! -z "$DATABASE_URL" ]; then
+        echo "Using RENDER_INTERNAL_DATABASE_URL with internal key"
+    # Check for external connection with key
+    elif [ ! -z "$DATABASE_URL" ] && [ ! -z "$RENDER_EXTERNAL_DB_KEY" ]; then
         url="$DATABASE_URL"
-        echo "Using DATABASE_URL"
+        echo "Using DATABASE_URL with external key"
     else
         echo "Using individual environment variables"
         echo "$POSTGRES_USER $POSTGRES_PASSWORD $POSTGRES_HOST $POSTGRES_PORT $POSTGRES_DB"
@@ -40,6 +43,8 @@ echo "RENDER_EXTERNAL_HOSTNAME: $RENDER_EXTERNAL_HOSTNAME"
 echo "Database Host: $DB_HOST"
 echo "Database Port: $DB_PORT"
 echo "Database Name: $DB_NAME"
+echo "Internal Key Present: $([ ! -z "$RENDER_INTERNAL_DB_KEY" ] && echo "Yes" || echo "No")"
+echo "External Key Present: $([ ! -z "$RENDER_EXTERNAL_DB_KEY" ] && echo "Yes" || echo "No")"
 
 # Function to check if we can connect to PostgreSQL server
 check_postgres() {
