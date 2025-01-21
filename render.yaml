@@ -23,9 +23,9 @@ services:
       - key: PYTHON_VERSION
         value: 3.11.0
       - key: INTERNAL_DATABASE_URL
-        sync: false
-      - key: EXTERNAL_DATABASE_URL
-        sync: false
+        fromDatabase:
+          name: hotel-tracker-db
+          property: connectionString
       - key: ENVIRONMENT
         value: production
       - key: DEBUG
@@ -96,6 +96,13 @@ services:
     ipAllowList: []
     plan: free
     maxmemoryPolicy: noeviction
+
+  - type: postgresql
+    name: hotel-tracker-db
+    region: ohio
+    plan: starter
+    ipAllowList: []
+    postgresMajorVersion: 15
 
 databases:
   - name: hotel-tracker-db
