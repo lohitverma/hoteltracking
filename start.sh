@@ -206,4 +206,4 @@ PORT="${PORT:-10000}"
 echo "Starting application on port $PORT..."
 
 # Start the application
-exec uvicorn main:app --host 0.0.0.0 --port "$PORT" --workers 4 --log-level info
+exec uvicorn main:app --host 0.0.0.0 --port "$PORT" --workers 4 --log-level debug

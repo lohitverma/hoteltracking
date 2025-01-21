@@ -131,16 +131,25 @@ def get_database_url():
 
 def create_db_engine(max_retries=5, retry_interval=5):
     """Create database engine with retry logic"""
-    # Use the exact database URL from Render.com
-    database_url = os.getenv(
-        "DATABASE_URL",
-        "postgresql://hoteltracker_user:VoKj4Xa7xyG0DhH2Fa0UW48QFd7gGZme@dpg-cu7failds78s73arp6j0-a/hoteltracker"
-    )
+    database_url = os.getenv("DATABASE_URL")
+    if not database_url:
+        raise ValueError("DATABASE_URL environment variable is not set")
     
-    logger.info("Attempting database connection...")
-    logger.info(f"Using database URL format: postgresql://user:****@{database_url.split('@')[1] if '@' in database_url else 'host/dbname'}")
+    # Parse the URL for logging (without exposing password)
+    try:
+        parts = database_url.split("@")
+        if len(parts) == 2:
+            user_part = parts[0].split("://")[1].split(":")[0]
+            host_part = parts[1]
+            logger.info(f"Database connection info:")
+            logger.info(f"User: {user_part}")
+            logger.info(f"Host: {host_part}")
+    except Exception as e:
+        logger.error(f"Error parsing DATABASE_URL: {str(e)}")
     
-    # Create the engine with minimal configuration
+    logger.info("Creating database engine...")
+    
+    # Create the engine with specific configuration for Render.com
     engine = create_engine(
         database_url,
         pool_size=1,
@@ -148,18 +157,24 @@ def create_db_engine(max_retries=5, retry_interval=5):
         pool_timeout=30,
         connect_args={
             'connect_timeout': 10,
-            'application_name': 'hoteltracker'
+            'application_name': 'hoteltracker',
+            'sslmode': 'require'
         }
     )
     
     # Test connection
     try:
         with engine.connect() as connection:
-            connection.execute("SELECT 1")
-            logger.info("Database connection successful!")
+            result = connection.execute("SELECT version();").scalar()
+            logger.info(f"Database connection successful! PostgreSQL version: {result}")
             return engine
     except Exception as e:
-        logger.error(f"Database connection failed: {str(e)}")
+        logger.error(f"Database connection failed with error: {str(e)}")
+        logger.error("Please check:")
+        logger.error("1. Database URL format is correct")
+        logger.error("2. Database service is running")
+        logger.error("3. Network connectivity is available")
+        logger.error("4. Database credentials are correct")
         raise
 
 # Initialize engine with retry logic
