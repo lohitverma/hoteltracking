@@ -17,12 +17,12 @@ export default defineConfig({
     outDir: 'dist',
     sourcemap: true,
     rollupOptions: {
-      external: ['recharts'],
+      external: [],
       output: {
         manualChunks: {
           vendor: ['react', 'react-dom', 'react-router-dom'],
           ui: ['@mui/material', '@emotion/react', '@emotion/styled'],
-          charts: ['recharts']
+          charts: ['recharts', '@mui/x-date-pickers', 'date-fns']
         }
       }
     }
