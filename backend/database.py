@@ -97,59 +97,66 @@ def get_database_url():
     """Get and validate database URL"""
     # First try to get the complete DATABASE_URL
     database_url = os.getenv("DATABASE_URL")
-    internal_database_url = os.getenv("RENDER_INTERNAL_DATABASE_URL")
+    internal_database_url = os.getenv("INTERNAL_DATABASE_URL", os.getenv("RENDER_INTERNAL_DATABASE_URL"))
     
     # Log available environment variables (without sensitive data)
     env_vars = {
         'DATABASE_URL exists': bool(database_url),
-        'RENDER_INTERNAL_DATABASE_URL exists': bool(internal_database_url),
-        'POSTGRES_HOST': os.getenv('POSTGRES_HOST'),
-        'POSTGRES_PORT': os.getenv('POSTGRES_PORT'),
-        'POSTGRES_DB': os.getenv('POSTGRES_DB')
+        'INTERNAL_DATABASE_URL exists': bool(internal_database_url),
+        'RENDER_INTERNAL_DATABASE_URL exists': bool(os.getenv("RENDER_INTERNAL_DATABASE_URL")),
+        'RENDER_EXTERNAL_HOSTNAME': os.getenv('RENDER_EXTERNAL_HOSTNAME'),
+        'RENDER_SERVICE_NAME': os.getenv('RENDER_SERVICE_NAME'),
+        'RENDER_SERVICE_TYPE': os.getenv('RENDER_SERVICE_TYPE')
     }
     logger.info(f"Environment configuration: {env_vars}")
     
     if internal_database_url:
-        logger.info("Using RENDER_INTERNAL_DATABASE_URL")
+        logger.info("Using internal database URL for Render.com")
         database_url = internal_database_url
     elif database_url:
-        logger.info("Using DATABASE_URL")
+        logger.info("Using external DATABASE_URL")
     else:
-        logger.warning("No DATABASE_URL or RENDER_INTERNAL_DATABASE_URL found, using individual parameters")
-    
-    if database_url:
-        # Handle Render.com's postgres:// vs postgresql:// issue
-        if database_url.startswith("postgres://"):
-            database_url = database_url.replace("postgres://", "postgresql://", 1)
-            logger.info("Converted postgres:// to postgresql:// in database URL")
+        logger.warning("No database URL found, using individual parameters")
+        # Construct from individual components
+        db_user = os.getenv("POSTGRES_USER", "postgres")
+        db_password = os.getenv("POSTGRES_PASSWORD", "postgres")
+        db_host = os.getenv("POSTGRES_HOST", "localhost")
+        db_port = os.getenv("POSTGRES_PORT", "5432")
+        db_name = os.getenv("POSTGRES_DB", "hoteltracker")
         
-        # Parse and validate database URL
-        db_params = parse_db_url(database_url)
-        if db_params:
-            logger.info(f"Checking connectivity to database host: {db_params['host']}:{db_params['port']}")
-            if check_host_connectivity(db_params['host'], db_params['port']):
-                # Try psql connection
-                if run_psql_check(db_params['host'], db_params['port'], db_params['user'], db_params['dbname']):
-                    logger.info("Database connection test successful")
-                else:
-                    logger.error("Database connection test failed")
-        
-        return database_url
+        database_url = f"postgresql://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}"
+        logger.info(f"Using constructed URL with host: {db_host}:{db_port}/{db_name}")
     
-    # If no DATABASE_URL, construct from individual components
-    db_user = os.getenv("POSTGRES_USER", "postgres")
-    db_password = os.getenv("POSTGRES_PASSWORD", "postgres")
-    db_host = os.getenv("POSTGRES_HOST", "localhost")
-    db_port = os.getenv("POSTGRES_PORT", "5432")
-    db_name = os.getenv("POSTGRES_DB", "hoteltracker")
+    # Handle URL format
+    if database_url.startswith("postgres://"):
+        database_url = database_url.replace("postgres://", "postgresql://", 1)
+        logger.info("Converted postgres:// to postgresql:// in URL")
     
-    # Check host connectivity
-    logger.info(f"Checking connectivity to database host: {db_host}:{db_port}")
-    check_host_connectivity(db_host, db_port)
+    # Parse and validate URL
+    try:
+        parsed = parse_db_url(database_url)
+        if parsed:
+            # Only log non-sensitive parts
+            logger.info(f"Database host: {parsed['host']}")
+            logger.info(f"Database port: {parsed['port']}")
+            logger.info(f"Database name: {parsed['dbname']}")
+            
+            # Check connectivity
+            if check_host_connectivity(parsed['host'], parsed['port']):
+                logger.info("Host connectivity check passed")
+            else:
+                logger.error("Host connectivity check failed")
+                
+            # Try to resolve host
+            try:
+                ip = socket.gethostbyname(parsed['host'])
+                logger.info(f"Resolved database host to IP: {ip}")
+            except socket.gaierror as e:
+                logger.error(f"Failed to resolve database host: {str(e)}")
+    except Exception as e:
+        logger.error(f"Error validating database URL: {str(e)}")
     
-    constructed_url = f"postgresql://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}"
-    logger.info(f"Using constructed database URL with host: {db_host}:{db_port}/{db_name}")
-    return constructed_url
+    return database_url
 
 @tracer.wrap(name='database.engine_creation')
 def create_db_engine(max_retries=5, retry_interval=5):
