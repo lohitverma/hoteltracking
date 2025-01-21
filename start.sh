@@ -10,19 +10,21 @@ cd "$(dirname "$0")"
 export PYTHONPATH="${PYTHONPATH:-.}:$(pwd):$(pwd)/backend"
 echo "PYTHONPATH set to: $PYTHONPATH"
 
-# Set default port if not provided
-export PORT="${PORT:-10000}"
-echo "Port set to: $PORT"
+# Set and export port
+if [ -z "${PORT}" ]; then
+    export PORT=10000
+fi
+echo "PORT environment variable set to: $PORT"
 
 # Function to parse DATABASE_URL
 parse_db_url() {
     # Try URLs in order: internal -> external -> fallback
     if [ -n "$INTERNAL_DATABASE_URL" ]; then
-        DATABASE_URL="$INTERNAL_DATABASE_URL"
         echo "Using internal DATABASE_URL"
+        export DATABASE_URL="$INTERNAL_DATABASE_URL"
     elif [ -n "$EXTERNAL_DATABASE_URL" ]; then
-        DATABASE_URL="$EXTERNAL_DATABASE_URL"
         echo "Using external DATABASE_URL"
+        export DATABASE_URL="$EXTERNAL_DATABASE_URL"
     elif [ -z "$DATABASE_URL" ]; then
         echo "ERROR: No database URL configured"
         echo "Please set either INTERNAL_DATABASE_URL, EXTERNAL_DATABASE_URL, or DATABASE_URL"
@@ -55,8 +57,8 @@ parse_db_url() {
     fi
 }
 
-# Parse the database URL
-parse_db_url
+echo "Parsing DATABASE_URL..."
+parse_db_url "$DATABASE_URL"
 
 # Test PostgreSQL connection
 echo "Testing PostgreSQL connection..."
@@ -237,4 +239,4 @@ alembic upgrade head
 
 # Start the application with explicit port binding
 echo "Starting application on port $PORT..."
-exec uvicorn main:app --host 0.0.0.0 --port "$PORT" --workers 4
+exec python -m uvicorn main:app --host 0.0.0.0 --port "$PORT" --workers 4

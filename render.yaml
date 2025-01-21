@@ -6,6 +6,7 @@ services:
     plan: starter
     dockerfilePath: ./Dockerfile
     healthCheckPath: /health
+    port: 10000
     domains:
       - hoteltracker.org
       - api.hoteltracker.org
