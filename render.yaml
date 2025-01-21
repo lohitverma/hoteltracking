@@ -97,7 +97,7 @@ services:
     plan: free
     maxmemoryPolicy: noeviction
 
-  - type: postgresql
+  - type: pserv
     name: hotel-tracker-db
     region: ohio
     plan: starter
