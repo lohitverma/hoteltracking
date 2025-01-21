@@ -1,28 +1,43 @@
-from sqlalchemy import create_engine, exc
+import os
+import time
+import logging
+from sqlalchemy import create_engine, MetaData, exc
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
-import os
+from sqlalchemy.exc import OperationalError
+from urllib.parse import urlparse
 from dotenv import load_dotenv
-import logging
-import time
 import socket
 import subprocess
 import sys
 from datadog import statsd
 from ddtrace import tracer
-from sqlalchemy.engine.url import make_url
 
 load_dotenv()
 
 # Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Create Base class for models
-Base = declarative_base()
+def wait_for_db(url, max_retries=5, retry_interval=5):
+    """Wait for database to become available."""
+    parsed = urlparse(url)
+    logger.info(f"Attempting to connect to database at {parsed.hostname}")
+    
+    for attempt in range(max_retries):
+        try:
+            engine = create_engine(url)
+            engine.connect()
+            logger.info("Successfully connected to database!")
+            return engine
+        except OperationalError as e:
+            if attempt < max_retries - 1:
+                logger.warning(f"Database connection attempt {attempt + 1} failed. Retrying in {retry_interval} seconds...")
+                logger.debug(f"Error details: {str(e)}")
+                time.sleep(retry_interval)
+            else:
+                logger.error("Failed to connect to database after maximum retries")
+                raise
 
 def run_psql_check(host, port, user, dbname):
     """Run psql command to check database connection"""
@@ -98,28 +113,58 @@ def parse_db_url(url):
         return None
 
 def get_database_url():
-    """Get the appropriate database URL based on environment"""
-    # Try internal URL first (faster within Render's network)
+    """Get database URL with fallback logic."""
     internal_url = os.getenv("INTERNAL_DATABASE_URL")
     external_url = os.getenv("EXTERNAL_DATABASE_URL")
-    fallback_url = os.getenv("DATABASE_URL")  # For backward compatibility
+    
+    if not internal_url and not external_url:
+        raise ValueError("No database URL configured. Set INTERNAL_DATABASE_URL or EXTERNAL_DATABASE_URL")
     
     urls_to_try = []
-    
     if internal_url:
         urls_to_try.append(("internal", internal_url))
     if external_url:
         urls_to_try.append(("external", external_url))
-    if fallback_url:
-        urls_to_try.append(("fallback", fallback_url))
-        
-    if not urls_to_try:
-        raise ValueError(
-            "No database URL configured. Please set either INTERNAL_DATABASE_URL, "
-            "EXTERNAL_DATABASE_URL, or DATABASE_URL environment variable."
-        )
     
-    return urls_to_try
+    last_error = None
+    for url_type, url in urls_to_try:
+        try:
+            logger.info(f"Attempting connection using {url_type} URL...")
+            parsed = urlparse(url)
+            logger.info(f"Connection info ({url_type}):")
+            logger.info(f"User: {parsed.username}")
+            logger.info(f"Host: {parsed.hostname}")
+            logger.info(f"Database: {parsed.path[1:]}")  # Remove leading /
+            engine = wait_for_db(url)
+            logger.info(f"Successfully connected using {url_type} URL")
+            return engine
+        except Exception as e:
+            last_error = e
+            logger.warning(f"Failed to connect using {url_type} URL: {str(e)}")
+    
+    raise last_error
+
+# Create database engine
+try:
+    engine = get_database_url()
+except Exception as e:
+    logger.error(f"Failed to initialize database: {str(e)}")
+    raise
+
+# Create session factory
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+# Create base class for declarative models
+Base = declarative_base()
+metadata = MetaData()
+
+def get_db():
+    """Get database session."""
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
 
 def test_connection(engine):
     """Test database connection and return version info"""
@@ -135,104 +180,3 @@ def test_connection(engine):
             }
     except Exception as e:
         return False, str(e)
-
-def create_db_engine(max_retries=5, retry_interval=5):
-    """Create database engine with retry logic and URL fallback"""
-    last_exception = None
-    urls_to_try = get_database_url()
-    
-    for url_type, database_url in urls_to_try:
-        logger.info(f"Attempting connection using {url_type} URL...")
-        
-        # Parse URL for logging (without exposing credentials)
-        try:
-            parsed_url = make_url(database_url)
-            logger.info(f"Connection info ({url_type}):")
-            logger.info(f"User: {parsed_url.username}")
-            logger.info(f"Host: {parsed_url.host}")
-            logger.info(f"Database: {parsed_url.database}")
-        except Exception as e:
-            logger.error(f"Error parsing {url_type} URL: {str(e)}")
-            continue
-        
-        # Try to connect with retries
-        retry_count = 0
-        while retry_count < max_retries:
-            try:
-                logger.info(f"Creating database engine (attempt {retry_count + 1}/{max_retries})...")
-                engine = create_engine(
-                    database_url,
-                    pool_size=1,
-                    max_overflow=2,
-                    pool_timeout=30,
-                    connect_args={
-                        'connect_timeout': 10,
-                        'application_name': 'hoteltracker',
-                        'sslmode': 'require',
-                        'keepalives': 1,
-                        'keepalives_idle': 30,
-                        'keepalives_interval': 10,
-                        'keepalives_count': 5
-                    }
-                )
-                
-                # Test the connection
-                success, info = test_connection(engine)
-                if success:
-                    logger.info(f"Successfully connected using {url_type} URL!")
-                    logger.info(f"PostgreSQL version: {info['version']}")
-                    logger.info(f"Connected as: {info['user']}")
-                    logger.info(f"Database: {info['database']}")
-                    return engine
-                    
-            except Exception as e:
-                last_exception = e
-                error_msg = str(e)
-                logger.warning(f"Connection attempt {retry_count + 1} failed: {error_msg}")
-                
-                if "password authentication failed" in error_msg:
-                    logger.error(f"Authentication failed for {url_type} URL")
-                    break  # Don't retry auth failures
-                    
-                retry_count += 1
-                if retry_count < max_retries:
-                    logger.info(f"Retrying in {retry_interval} seconds...")
-                    time.sleep(retry_interval)
-                    
-        logger.error(f"All attempts failed for {url_type} URL")
-    
-    # If we get here, all URLs failed
-    error_msg = str(last_exception) if last_exception else "Unknown error"
-    logger.error("All database connection attempts failed!")
-    logger.error(f"Last error: {error_msg}")
-    
-    if "could not connect to server" in error_msg:
-        logger.error("Could not reach the database server. Please check:")
-        logger.error("1. The database service is running")
-        logger.error("2. The host is correct")
-        logger.error("3. Network connectivity is available")
-    elif "password authentication failed" in error_msg:
-        logger.error("Authentication failed. Please check:")
-        logger.error("1. The database username is correct")
-        logger.error("2. The database password is correct")
-    elif "SSL SYSCALL error" in error_msg:
-        logger.error("SSL connection error. Please check:")
-        logger.error("1. SSL is properly configured")
-        logger.error("2. The connection is not being blocked by a firewall")
-    
-    raise Exception("Failed to connect to database using any available URL")
-
-# Initialize engine with retry logic
-try:
-    engine = create_db_engine()
-    SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-except Exception as e:
-    logger.error(f"Database initialization failed: {str(e)}")
-    raise
-
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
