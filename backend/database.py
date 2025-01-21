@@ -8,6 +8,8 @@ import time
 import socket
 import subprocess
 import sys
+from datadog import statsd
+from ddtrace import tracer
 
 load_dotenv()
 
@@ -32,30 +34,36 @@ def run_psql_check(host, port, user, dbname):
         logger.error(f"Error running psql check: {str(e)}")
         return False
 
+@tracer.wrap(name='database.connectivity_check')
 def check_host_connectivity(host, port, timeout=5):
     """Check if host is reachable"""
-    try:
-        # Try DNS resolution first
+    with tracer.trace('database.dns_resolution'):
         try:
             logger.info(f"Resolving DNS for {host}")
             addr_info = socket.getaddrinfo(host, port, socket.AF_INET, socket.SOCK_STREAM)
             ip = addr_info[0][4][0]
             logger.info(f"DNS resolution successful: {host} -> {ip}")
+            statsd.increment('database.dns_resolution.success')
         except socket.gaierror as e:
             logger.error(f"DNS resolution failed for {host}: {str(e)}")
+            statsd.increment('database.dns_resolution.failure')
             return False
 
-        # Try TCP connection
-        sock = socket.create_connection((host, int(port)), timeout=timeout)
-        sock.close()
-        logger.info(f"Successfully connected to host {host}:{port}")
-        return True
-    except (socket.timeout, socket.gaierror, ConnectionRefusedError) as e:
-        logger.error(f"Failed to connect to {host}:{port} - {str(e)}")
-        return False
-    except Exception as e:
-        logger.error(f"Unexpected error connecting to {host}:{port} - {str(e)}")
-        return False
+    with tracer.trace('database.tcp_connection'):
+        try:
+            sock = socket.create_connection((host, int(port)), timeout=timeout)
+            sock.close()
+            logger.info(f"Successfully connected to host {host}:{port}")
+            statsd.increment('database.connection.success')
+            return True
+        except (socket.timeout, socket.gaierror, ConnectionRefusedError) as e:
+            logger.error(f"Failed to connect to {host}:{port} - {str(e)}")
+            statsd.increment('database.connection.failure')
+            return False
+        except Exception as e:
+            logger.error(f"Unexpected error connecting to {host}:{port} - {str(e)}")
+            statsd.increment('database.connection.error')
+            return False
 
 def parse_db_url(url):
     """Parse database URL into components"""
@@ -143,6 +151,7 @@ def get_database_url():
     logger.info(f"Using constructed database URL with host: {db_host}:{db_port}/{db_name}")
     return constructed_url
 
+@tracer.wrap(name='database.engine_creation')
 def create_db_engine(max_retries=5, retry_interval=5):
     """Create database engine with retry logic"""
     retry_count = 0
@@ -150,35 +159,39 @@ def create_db_engine(max_retries=5, retry_interval=5):
     
     while retry_count < max_retries:
         try:
-            database_url = get_database_url()
-            # Only log the non-sensitive parts of the URL
-            url_parts = database_url.split('@')
-            if len(url_parts) > 1:
-                logger.info(f"Attempting database connection to: {url_parts[1]}")
+            with tracer.trace('database.url_preparation'):
+                database_url = get_database_url()
+                url_parts = database_url.split('@')
+                if len(url_parts) > 1:
+                    logger.info(f"Attempting database connection to: {url_parts[1]}")
             
-            engine = create_engine(
-                database_url,
-                pool_size=5,
-                max_overflow=10,
-                pool_timeout=30,
-                pool_pre_ping=True,
-                pool_recycle=300,
-                connect_args={
-                    'connect_timeout': 10,
-                    'options': '-c statement_timeout=30000',
-                    'sslmode': 'require'  # Enable SSL for Render.com
-                }
-            )
+            with tracer.trace('database.engine_initialization'):
+                engine = create_engine(
+                    database_url,
+                    pool_size=5,
+                    max_overflow=10,
+                    pool_timeout=30,
+                    pool_pre_ping=True,
+                    pool_recycle=300,
+                    connect_args={
+                        'connect_timeout': 10,
+                        'options': '-c statement_timeout=30000',
+                        'sslmode': 'require'  # Enable SSL for Render.com
+                    }
+                )
             
             # Verify connection
-            with engine.connect() as connection:
-                connection.execute("SELECT 1")
-                logger.info("Database connection successful!")
-                return engine
+            with tracer.trace('database.connection_verification'):
+                with engine.connect() as connection:
+                    connection.execute("SELECT 1")
+                    logger.info("Database connection successful!")
+                    statsd.increment('database.connection.success')
+                    return engine
                 
         except exc.OperationalError as e:
             last_exception = e
             retry_count += 1
+            statsd.increment('database.connection.retry')
             if retry_count < max_retries:
                 logger.warning(f"Database connection attempt {retry_count} failed: {str(e)}")
                 logger.info(f"Retrying in {retry_interval} seconds...")
@@ -186,9 +199,11 @@ def create_db_engine(max_retries=5, retry_interval=5):
             else:
                 logger.error(f"Failed to connect to database after {max_retries} attempts")
                 logger.error(f"Last error: {str(e)}")
+                statsd.increment('database.connection.failure')
                 raise
         except Exception as e:
             logger.error(f"Unexpected error during database connection: {str(e)}")
+            statsd.increment('database.connection.error')
             raise
 
 # Initialize engine with retry logic

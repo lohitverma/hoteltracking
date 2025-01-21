@@ -42,8 +42,30 @@ from services.cache_service import CacheService
 from services.email_verification_service import EmailVerificationService
 from services.price_tracking_service import PriceTrackingService
 from services.health_service import HealthService
+import sys
+from ddtrace import patch_all
+from ddtrace import tracer
+from datadog import initialize, statsd
 
 load_dotenv()
+
+# Configure Datadog
+datadog_api_key = os.getenv('DD_API_KEY')
+if datadog_api_key:
+    # Initialize the Datadog tracer
+    patch_all()
+    
+    # Initialize the Datadog client
+    initialize(
+        api_key=datadog_api_key,
+        host_name=os.getenv('RENDER_EXTERNAL_HOSTNAME', 'localhost')
+    )
+    
+    logger = logging.getLogger(__name__)
+    logger.info("Datadog initialization successful")
+else:
+    logger = logging.getLogger(__name__)
+    logger.warning("DD_API_KEY not found. Datadog monitoring is disabled.")
 
 # Configure logging
 logging.basicConfig(
@@ -53,8 +75,6 @@ logging.basicConfig(
         logging.StreamHandler(sys.stdout)
     ]
 )
-
-logger = logging.getLogger(__name__)
 
 app = FastAPI(
     title="Hotel Tracker API",
