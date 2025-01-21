@@ -35,7 +35,6 @@ FROM python:3.11-slim
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONPATH=/app:/app/backend \
-    PORT=10000 \
     VIRTUAL_ENV=/opt/venv
 
 # Install runtime dependencies including PostgreSQL client
@@ -69,8 +68,8 @@ RUN chmod +x start.sh && \
 # Switch to non-root user
 USER appuser
 
-# Expose the port
-EXPOSE ${PORT}
+# Expose default port (will be overridden by PORT env var)
+EXPOSE 10000
 
 # Start the application
 CMD ["./start.sh"]

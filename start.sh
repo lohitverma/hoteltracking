@@ -104,6 +104,9 @@ fi
 echo "Applying database migrations..."
 alembic upgrade head
 
+# Get the port from environment variable or use default
+PORT="${PORT:-10000}"
+echo "Starting application on port $PORT..."
+
 # Start the application
-echo "Starting the application..."
-exec uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000} --workers 4 --log-level info
+exec uvicorn main:app --host 0.0.0.0 --port "$PORT" --workers 4 --log-level info
