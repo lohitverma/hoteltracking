@@ -95,170 +95,98 @@ def parse_db_url(url):
 
 def get_database_url():
     """Get and validate database URL"""
-    # Get database URLs with distinct key names
-    internal_database_url = os.getenv("RENDER_INTERNAL_DATABASE_URL")
-    database_url = os.getenv("DATABASE_URL")
+    # Get individual components
+    db_user = os.getenv("POSTGRES_USER", "hoteltracker_user")
+    db_password = os.getenv("POSTGRES_PASSWORD")
+    db_host = os.getenv("POSTGRES_HOST", "dpg-cu7failds78s73arp6j0-a.oregon-postgres.render.com")
+    db_port = os.getenv("POSTGRES_PORT", "5432")
+    db_name = os.getenv("POSTGRES_DB", "hoteltracker")
     
-    # Get the database keys with distinct names
-    internal_key = os.getenv("RENDER_INTERNAL_DB_KEY")
-    external_key = os.getenv("RENDER_EXTERNAL_DB_KEY")
+    # Log configuration (without sensitive data)
+    logger.info(f"Database Configuration:")
+    logger.info(f"Host: {db_host}")
+    logger.info(f"Port: {db_port}")
+    logger.info(f"Database: {db_name}")
+    logger.info(f"User: {db_user}")
     
-    # Log available environment variables (without sensitive data)
-    env_vars = {
-        'DATABASE_URL exists': bool(database_url),
-        'RENDER_INTERNAL_DATABASE_URL exists': bool(internal_database_url),
-        'Internal DB Key exists': bool(internal_key),
-        'External DB Key exists': bool(external_key),
-        'RENDER_EXTERNAL_HOSTNAME': os.getenv('RENDER_EXTERNAL_HOSTNAME'),
-        'RENDER_SERVICE_NAME': os.getenv('RENDER_SERVICE_NAME'),
-        'RENDER_SERVICE_TYPE': os.getenv('RENDER_SERVICE_TYPE')
-    }
-    logger.info(f"Environment configuration: {env_vars}")
+    # Construct database URL
+    database_url = f"postgresql://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}"
     
-    if internal_database_url and internal_key:
-        logger.info("Using RENDER_INTERNAL_DATABASE_URL with internal key")
-        database_url = internal_database_url
-    elif database_url and external_key:
-        logger.info("Using external DATABASE_URL with external key")
-    else:
-        logger.warning("No database URL or key found, using individual parameters")
-        # Construct from individual components
-        db_user = os.getenv("POSTGRES_USER", "postgres")
-        db_password = os.getenv("POSTGRES_PASSWORD", "postgres")
-        db_host = os.getenv("POSTGRES_HOST", "localhost")
-        db_port = os.getenv("POSTGRES_PORT", "5432")
-        db_name = os.getenv("POSTGRES_DB", "hoteltracker")
-        
-        database_url = f"postgresql://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}"
-        logger.info(f"Using constructed URL with host: {db_host}:{db_port}/{db_name}")
-    
-    # Handle URL format
-    if database_url and database_url.startswith("postgres://"):
-        database_url = database_url.replace("postgres://", "postgresql://", 1)
-        logger.info("Converted postgres:// to postgresql:// in URL")
-    
-    # Parse and validate URL
+    # Test DNS resolution
     try:
-        parsed = parse_db_url(database_url)
-        if parsed:
-            # Only log non-sensitive parts
-            logger.info(f"Database host: {parsed['host']}")
-            logger.info(f"Database port: {parsed['port']}")
-            logger.info(f"Database name: {parsed['dbname']}")
-            
-            # Check connectivity
-            if check_host_connectivity(parsed['host'], parsed['port']):
-                logger.info("Host connectivity check passed")
-            else:
-                logger.error("Host connectivity check failed")
-                
-            # Try to resolve host
-            try:
-                ip = socket.gethostbyname(parsed['host'])
-                logger.info(f"Resolved database host to IP: {ip}")
-            except socket.gaierror as e:
-                logger.error(f"Failed to resolve database host: {str(e)}")
+        ip_address = socket.gethostbyname(db_host)
+        logger.info(f"Successfully resolved {db_host} to {ip_address}")
+    except socket.gaierror as e:
+        logger.error(f"DNS resolution failed for {db_host}: {str(e)}")
+    
+    # Test TCP connection
+    try:
+        sock = socket.create_connection((db_host, int(db_port)), timeout=5)
+        sock.close()
+        logger.info(f"TCP connection test successful to {db_host}:{db_port}")
     except Exception as e:
-        logger.error(f"Error validating database URL: {str(e)}")
+        logger.error(f"TCP connection test failed: {str(e)}")
     
     return database_url
 
-@tracer.wrap(name='database.engine_creation')
 def create_db_engine(max_retries=5, retry_interval=5):
     """Create database engine with retry logic"""
     retry_count = 0
     last_exception = None
     
-    while retry_count < max_retries:
+    # Get database parameters
+    db_user = os.getenv("POSTGRES_USER", "hoteltracker_user")
+    db_password = os.getenv("POSTGRES_PASSWORD")
+    db_host = os.getenv("POSTGRES_HOST", "dpg-cu7failds78s73arp6j0-a.oregon-postgres.render.com")
+    db_port = os.getenv("POSTGRES_PORT", "5432")
+    db_name = os.getenv("POSTGRES_DB", "hoteltracker")
+    
+    # Log configuration (without sensitive data)
+    logger.info(f"Database Configuration:")
+    logger.info(f"Host: {db_host}")
+    logger.info(f"Port: {db_port}")
+    logger.info(f"Database: {db_name}")
+    logger.info(f"User: {db_user}")
+    
+    # Base URL without SSL mode
+    base_url = f"postgresql://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}"
+    
+    # Try different SSL modes
+    ssl_modes = ['require', 'verify-full', 'verify-ca', 'prefer', 'disable']
+    
+    for ssl_mode in ssl_modes:
         try:
-            with tracer.trace('database.url_preparation'):
-                database_url = get_database_url()
-                url_parts = database_url.split('@')
-                if len(url_parts) > 1:
-                    logger.info(f"Attempting database connection to: {url_parts[1]}")
+            logger.info(f"Attempting connection with sslmode={ssl_mode}")
             
-            with tracer.trace('database.engine_initialization'):
-                # Create the engine with specific configuration for Render.com
-                engine = create_engine(
-                    database_url,
-                    pool_size=5,
-                    max_overflow=10,
-                    pool_timeout=30,
-                    pool_pre_ping=True,
-                    pool_recycle=300,
-                    connect_args={
-                        'connect_timeout': 30,  # Increased timeout
-                        'options': '-c statement_timeout=30000',
-                        'sslmode': 'require',
-                        'application_name': 'hoteltracker',
-                        'keepalives': 1,
-                        'keepalives_idle': 30,
-                        'keepalives_interval': 10,
-                        'keepalives_count': 5
-                    }
-                )
+            # Create the engine with current SSL mode
+            engine = create_engine(
+                f"{base_url}?sslmode={ssl_mode}",
+                pool_size=1,
+                max_overflow=2,
+                pool_timeout=30,
+                connect_args={
+                    'connect_timeout': 10,
+                    'application_name': 'hoteltracker',
+                    'keepalives': 1,
+                    'keepalives_idle': 30,
+                    'keepalives_interval': 10,
+                    'keepalives_count': 5
+                }
+            )
             
-            # Verify connection with detailed error handling
-            with tracer.trace('database.connection_verification'):
-                try:
-                    with engine.connect() as connection:
-                        # Test basic connectivity
-                        connection.execute("SELECT 1")
-                        logger.info("Basic connectivity test passed")
-                        
-                        # Test database permissions
-                        connection.execute("SELECT current_user, current_database()")
-                        logger.info("Permission test passed")
-                        
-                        # Get PostgreSQL version
-                        result = connection.execute("SHOW server_version").scalar()
-                        logger.info(f"Connected to PostgreSQL version: {result}")
-                        
-                        # Get current database name
-                        result = connection.execute("SELECT current_database()").scalar()
-                        logger.info(f"Connected to database: {result}")
-                        
-                        # Get SSL status
-                        result = connection.execute("SHOW ssl").scalar()
-                        logger.info(f"SSL status: {result}")
-                        
-                        statsd.increment('database.connection.success')
-                        return engine
-                except Exception as e:
-                    logger.error(f"Detailed connection test failed: {str(e)}")
-                    raise
+            # Test connection
+            with engine.connect() as connection:
+                # Test basic connectivity
+                connection.execute("SELECT 1")
+                logger.info(f"Connection successful with sslmode={ssl_mode}")
+                return engine
                 
-        except exc.OperationalError as e:
-            last_exception = e
-            retry_count += 1
-            statsd.increment('database.connection.retry')
-            
-            # Log detailed error information
-            error_msg = str(e)
-            if "could not connect to server" in error_msg:
-                logger.error("Network connectivity issue detected")
-            elif "password authentication failed" in error_msg:
-                logger.error("Authentication failed - check credentials")
-            elif "database" in error_msg and "does not exist" in error_msg:
-                logger.error("Database does not exist")
-            elif "SSL SYSCALL error" in error_msg:
-                logger.error("SSL connection issue detected")
-            else:
-                logger.error(f"Database connection error: {error_msg}")
-            
-            if retry_count < max_retries:
-                logger.warning(f"Database connection attempt {retry_count} failed: {str(e)}")
-                logger.info(f"Retrying in {retry_interval} seconds...")
-                time.sleep(retry_interval)
-            else:
-                logger.error(f"Failed to connect to database after {max_retries} attempts")
-                logger.error(f"Last error: {str(e)}")
-                statsd.increment('database.connection.failure')
-                raise
         except Exception as e:
-            logger.error(f"Unexpected error during database connection: {str(e)}")
-            statsd.increment('database.connection.error')
-            raise
+            logger.error(f"Connection failed with sslmode={ssl_mode}: {str(e)}")
+            continue
+    
+    # If we get here, all SSL modes failed
+    raise Exception("Failed to connect with any SSL mode")
 
 # Initialize engine with retry logic
 try:
