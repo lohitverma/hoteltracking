@@ -3,6 +3,9 @@ set -e
 
 echo "Starting application initialization..."
 
+# Ensure we're in the right directory
+cd "$(dirname "$0")"
+
 # Function to parse DATABASE_URL
 parse_db_url() {
     # Try URLs in order: internal -> external -> fallback
@@ -30,7 +33,7 @@ parse_db_url() {
         DB_NAME="${BASH_REMATCH[4]}"
         DB_PORT=5432
         
-        export DB_USER DB_HOST DB_NAME DB_PORT DB_PASSWORD
+        export DB_USER DB_HOST DB_NAME DB_PORT DB_PASSWORD DATABASE_URL
         
         echo "Successfully parsed database connection info:"
         echo "User: $DB_USER"
@@ -97,9 +100,6 @@ until check_postgres; do
 done
 
 echo "PostgreSQL server is ready!"
-
-# Ensure we're in the right directory
-cd "$(dirname "$0")"
 
 # Create alembic.ini if it doesn't exist
 if [ ! -f "alembic.ini" ]; then
@@ -256,17 +256,23 @@ fi
 echo "Ensuring migrations/versions directory exists..."
 mkdir -p migrations/versions
 
+# Set the port for uvicorn
+PORT="${PORT:-10000}"
+echo "Port set to: $PORT"
+
+# Export port for health check
+export PORT
+
 # Generate initial migration if no migrations exist
 if [ ! "$(ls -A migrations/versions)" ]; then
     echo "Generating initial migration..."
-    alembic revision --autogenerate -m "Initial migration"
+    PYTHONPATH=. alembic revision --autogenerate -m "Initial migration"
 fi
 
 # Apply database migrations
 echo "Applying database migrations..."
-alembic upgrade head
+PYTHONPATH=. alembic upgrade head
 
 # Start the application
-PORT="${PORT:-10000}"
 echo "Starting application on port $PORT..."
 exec uvicorn main:app --host 0.0.0.0 --port "$PORT" --workers 4 --log-level debug
