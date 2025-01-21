@@ -5,6 +5,7 @@ import socket
 import psutil
 from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from backend.database import SessionLocal, engine, Base, wait_for_db
 import uvicorn
 
@@ -42,6 +43,20 @@ async def startup_event():
     except Exception as e:
         logger.error(f"Failed to create database tables: {e}")
         sys.exit(1)
+
+@app.get("/")
+async def root():
+    """Root endpoint with API information."""
+    return JSONResponse({
+        "name": "Hotel Tracker API",
+        "version": "1.0.0",
+        "description": "API for tracking hotel prices and managing alerts",
+        "endpoints": {
+            "health": "/health",
+            "docs": "/docs",
+            "openapi": "/openapi.json"
+        }
+    })
 
 # Health check endpoint
 @app.get("/health")
