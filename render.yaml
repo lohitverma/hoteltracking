@@ -58,6 +58,31 @@ services:
         destination: https://$HOST
         status: 301
 
+  - type: web
+    name: hotel-tracker-frontend
+    env: static
+    buildCommand: cd frontend && npm install && npm run build
+    staticPublishPath: ./frontend/dist
+    domains:
+      - app.hoteltracker.org
+    headers:
+      - path: /*
+        name: Cache-Control
+        value: no-cache
+    routes:
+      - type: redirect
+        source: /api/*
+        destination: https://api.hoteltracker.org/*
+        status: 301
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      - key: VITE_API_URL
+        value: https://api.hoteltracker.org
+      - key: NODE_VERSION
+        value: 18.17.0
+
   - type: redis
     name: hotel-tracker-redis
     ipAllowList: []
