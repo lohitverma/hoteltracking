@@ -131,29 +131,16 @@ def get_database_url():
 
 def create_db_engine(max_retries=5, retry_interval=5):
     """Create database engine with retry logic"""
-    retry_count = 0
-    last_exception = None
-    
-    # Get database parameters
-    db_user = os.getenv("POSTGRES_USER", "hoteltracker_user")
-    db_password = os.getenv("POSTGRES_PASSWORD")
-    db_host = os.getenv("POSTGRES_HOST", "dpg-cu7failds78s73arp6j0-a")
-    db_port = os.getenv("POSTGRES_PORT", "5432")
-    db_name = os.getenv("POSTGRES_DB", "hoteltracker")  # Using correct database name
-    
-    # Log configuration (without sensitive data)
-    logger.info(f"Database Configuration:")
-    logger.info(f"Host: {db_host}")
-    logger.info(f"Port: {db_port}")
-    logger.info(f"Database: {db_name}")
-    logger.info(f"User: {db_user}")
-    
-    # Use the exact internal URL format from Render.com
-    database_url = os.getenv("DATABASE_URL", f"postgresql://{db_user}:{db_password}@{db_host}/{db_name}")
+    # Use the exact database URL from Render.com
+    database_url = os.getenv(
+        "DATABASE_URL",
+        "postgresql://hoteltracker_user:VoKj4Xa7xyG0DhH2Fa0UW48QFd7gGZme@dpg-cu7failds78s73arp6j0-a/hoteltracker"
+    )
     
     logger.info("Attempting database connection...")
+    logger.info(f"Using database URL format: postgresql://user:****@{database_url.split('@')[1] if '@' in database_url else 'host/dbname'}")
     
-    # Create the engine with specific configuration for Render.com
+    # Create the engine with minimal configuration
     engine = create_engine(
         database_url,
         pool_size=1,
@@ -161,8 +148,7 @@ def create_db_engine(max_retries=5, retry_interval=5):
         pool_timeout=30,
         connect_args={
             'connect_timeout': 10,
-            'application_name': 'hoteltracker',
-            'sslmode': 'require'
+            'application_name': 'hoteltracker'
         }
     )
     
