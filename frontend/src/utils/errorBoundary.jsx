@@ -1,6 +1,5 @@
 import React from 'react';
-import { Box, Button, Typography, Container } from '@mui/material';
-import { Refresh as RefreshIcon, BugReport as BugIcon } from '@mui/icons-material';
+import { Box, Typography, Button } from '@mui/material';
 
 class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -15,75 +14,61 @@ class ErrorBoundary extends React.Component {
   componentDidCatch(error, errorInfo) {
     this.setState({
       error: error,
-      errorInfo: errorInfo,
+      errorInfo: errorInfo
     });
-
-    // Log error to monitoring service
-    if (process.env.NODE_ENV === 'production') {
-      // Send to error monitoring service (e.g., Sentry)
-      console.error('Application Error:', error, errorInfo);
-    }
+    // You can also log the error to an error reporting service here
+    console.error('Error caught by ErrorBoundary:', error, errorInfo);
   }
 
-  handleRefresh = () => {
-    window.location.reload();
+  handleReset = () => {
+    this.setState({ hasError: false, error: null, errorInfo: null });
+    window.location.href = '/';
   };
 
   render() {
     if (this.state.hasError) {
       return (
-        <Container maxWidth="sm">
-          <Box
-            sx={{
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              minHeight: '100vh',
-              textAlign: 'center',
-              gap: 3,
-            }}
+        <Box
+          sx={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            minHeight: '100vh',
+            padding: 3,
+            textAlign: 'center'
+          }}
+        >
+          <Typography variant="h4" component="h1" gutterBottom>
+            Oops! Something went wrong.
+          </Typography>
+          <Typography variant="body1" color="text.secondary" paragraph>
+            We're sorry for the inconvenience. Please try refreshing the page or return to the home page.
+          </Typography>
+          <Button
+            variant="contained"
+            color="primary"
+            onClick={this.handleReset}
+            sx={{ mt: 2 }}
           >
-            <BugIcon sx={{ fontSize: 64, color: 'error.main' }} />
-            <Typography variant="h4" gutterBottom>
-              Oops! Something went wrong
-            </Typography>
-            <Typography variant="body1" color="text.secondary" paragraph>
-              We apologize for the inconvenience. Please try refreshing the page or contact support if the problem persists.
-            </Typography>
-            <Box sx={{ display: 'flex', gap: 2 }}>
-              <Button
-                variant="contained"
-                color="primary"
-                startIcon={<RefreshIcon />}
-                onClick={this.handleRefresh}
-              >
-                Refresh Page
-              </Button>
-              <Button
-                variant="outlined"
-                color="primary"
-                href="mailto:support@hoteltracker.com"
-              >
-                Contact Support
-              </Button>
+            Return to Home
+          </Button>
+          {process.env.NODE_ENV === 'development' && (
+            <Box sx={{ mt: 4, textAlign: 'left' }}>
+              <Typography variant="body2" color="error" component="pre">
+                {this.state.error && this.state.error.toString()}
+              </Typography>
+              <Typography variant="body2" component="pre" sx={{ mt: 2 }}>
+                {this.state.errorInfo && this.state.errorInfo.componentStack}
+              </Typography>
             </Box>
-            {process.env.NODE_ENV !== 'production' && (
-              <Box sx={{ mt: 4, textAlign: 'left' }}>
-                <Typography variant="subtitle2" color="error" gutterBottom>
-                  Error Details:
-                </Typography>
-                <pre style={{ overflow: 'auto', maxHeight: '200px' }}>
-                  {this.state.error && this.state.error.toString()}
-                  {this.state.errorInfo && this.state.errorInfo.componentStack}
-                </pre>
-              </Box>
-            )}
-          </Box>
-        </Container>
+          )}
+        </Box>
       );
     }
 
     return this.props.children;
   }
 }
+
+export default ErrorBoundary;
