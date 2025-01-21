@@ -17,15 +17,20 @@ export default defineConfig({
     outDir: 'dist',
     sourcemap: true,
     rollupOptions: {
+      external: ['recharts'],
       output: {
         manualChunks: {
           vendor: ['react', 'react-dom', 'react-router-dom'],
-          ui: ['@mui/material', '@emotion/react', '@emotion/styled']
+          ui: ['@mui/material', '@emotion/react', '@emotion/styled'],
+          charts: ['recharts']
         }
       }
     }
   },
   resolve: {
     extensions: ['.js', '.jsx', '.json']
+  },
+  optimizeDeps: {
+    include: ['recharts']
   }
 })
