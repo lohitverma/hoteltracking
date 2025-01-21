@@ -12,7 +12,6 @@ services:
     region: ohio
     plan: starter
     healthCheckPath: /health
-    port: 10000
     domains:
       - hoteltracker.org
       - api.hoteltracker.org
@@ -75,6 +74,8 @@ services:
     domains:
       - app.hoteltracker.org
     envVars:
+      - key: PORT
+        value: 3000
       - key: NODE_VERSION
         value: 18.x
       - key: VITE_API_URL
