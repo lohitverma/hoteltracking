@@ -10,6 +10,10 @@ cd "$(dirname "$0")"
 export PYTHONPATH="${PYTHONPATH:-.}:$(pwd):$(pwd)/backend"
 echo "PYTHONPATH set to: $PYTHONPATH"
 
+# Set default port if not provided
+export PORT="${PORT:-10000}"
+echo "Port set to: $PORT"
+
 # Function to parse DATABASE_URL
 parse_db_url() {
     # Try URLs in order: internal -> external -> fallback
@@ -54,55 +58,16 @@ parse_db_url() {
 # Parse the database URL
 parse_db_url
 
-# Function to test PostgreSQL connection
-test_postgres_connection() {
-    echo "Testing PostgreSQL Connection..."
-    
-    # Test TCP connection
-    echo "Testing TCP connection to $DB_HOST:$DB_PORT..."
-    if nc -zv "$DB_HOST" "$DB_PORT" 2>/dev/null; then
-        echo "TCP connection successful"
-    else
-        echo "TCP connection failed"
-        return 1
-    fi
-    
-    # Test PostgreSQL connection with SSL
-    echo "Testing PostgreSQL connection with SSL..."
-    if PGPASSWORD="$DB_PASSWORD" psql "postgresql://$DB_USER@$DB_HOST:$DB_PORT/$DB_NAME?sslmode=require" -c "SELECT version();" >/dev/null 2>&1; then
-        echo "PostgreSQL SSL connection successful"
-        return 0
-    else
-        echo "PostgreSQL SSL connection failed"
-        return 1
-    fi
-}
-
-# Function to check basic connectivity
-check_postgres() {
-    if PGPASSWORD="$DB_PASSWORD" psql "postgresql://$DB_USER@$DB_HOST:$DB_PORT/$DB_NAME?sslmode=require" -c '\q' >/dev/null 2>&1; then
-        return 0
-    fi
-    return 1
-}
-
-# Wait for PostgreSQL server to be ready
-MAX_RETRIES=60
-RETRY_INTERVAL=5
-RETRY_COUNT=0
-
-until check_postgres; do
-    RETRY_COUNT=$((RETRY_COUNT+1))
-    if [ $RETRY_COUNT -eq $MAX_RETRIES ]; then
-        echo "Error: Could not connect to PostgreSQL server after $MAX_RETRIES attempts"
-        echo "Final connection test results:"
-        test_postgres_connection
+# Test PostgreSQL connection
+echo "Testing PostgreSQL connection..."
+if ! pg_isready -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -t 5; then
+    echo "PostgreSQL server is not ready. Waiting..."
+    sleep 5
+    if ! pg_isready -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -t 5; then
+        echo "PostgreSQL server is still not ready. Please check your database configuration."
         exit 1
     fi
-    echo "PostgreSQL server is unavailable - sleeping for $RETRY_INTERVAL seconds (attempt $RETRY_COUNT/$MAX_RETRIES)"
-    sleep $RETRY_INTERVAL
-done
-
+fi
 echo "PostgreSQL server is ready!"
 
 # Create alembic.ini if it doesn't exist
@@ -256,27 +221,20 @@ def downgrade() -> None:
 EOL
 fi
 
-# Create versions directory if it doesn't exist
+# Ensure migrations directory exists
 echo "Ensuring migrations/versions directory exists..."
 mkdir -p migrations/versions
 
-# Set the port for uvicorn
-PORT="${PORT:-10000}"
-echo "Port set to: $PORT"
-
-# Export port for health check
-export PORT
-
-# Generate initial migration if no migrations exist
-if [ ! "$(ls -A migrations/versions)" ]; then
-    echo "Generating initial migration..."
-    PYTHONPATH=. alembic revision --autogenerate -m "Initial migration"
+# Generate initial migration if needed
+echo "Generating initial migration..."
+if [ ! -f migrations/versions/*.py ]; then
+    alembic revision --autogenerate -m "Initial migration"
 fi
 
-# Apply database migrations
-echo "Applying database migrations..."
-PYTHONPATH=. alembic upgrade head
+# Apply migrations
+echo "Applying migrations..."
+alembic upgrade head
 
-# Start the application
+# Start the application with explicit port binding
 echo "Starting application on port $PORT..."
-exec uvicorn main:app --host 0.0.0.0 --port "$PORT" --workers 4 --log-level debug
+exec uvicorn main:app --host 0.0.0.0 --port "$PORT" --workers 4
