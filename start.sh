@@ -6,10 +6,7 @@ echo "Starting application initialization..."
 # Function to get database connection parameters from DATABASE_URL or individual vars
 get_db_params() {
     local url=""
-    if [ ! -z "$INTERNAL_DATABASE_URL" ]; then
-        url="$INTERNAL_DATABASE_URL"
-        echo "Using INTERNAL_DATABASE_URL"
-    elif [ ! -z "$RENDER_INTERNAL_DATABASE_URL" ]; then
+    if [ ! -z "$RENDER_INTERNAL_DATABASE_URL" ]; then
         url="$RENDER_INTERNAL_DATABASE_URL"
         echo "Using RENDER_INTERNAL_DATABASE_URL"
     elif [ ! -z "$DATABASE_URL" ]; then

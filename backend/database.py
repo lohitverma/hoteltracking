@@ -95,15 +95,14 @@ def parse_db_url(url):
 
 def get_database_url():
     """Get and validate database URL"""
-    # First try to get the complete DATABASE_URL
+    # First try to get the internal URL (Render.com specific)
+    internal_database_url = os.getenv("RENDER_INTERNAL_DATABASE_URL")
     database_url = os.getenv("DATABASE_URL")
-    internal_database_url = os.getenv("INTERNAL_DATABASE_URL", os.getenv("RENDER_INTERNAL_DATABASE_URL"))
     
     # Log available environment variables (without sensitive data)
     env_vars = {
         'DATABASE_URL exists': bool(database_url),
-        'INTERNAL_DATABASE_URL exists': bool(internal_database_url),
-        'RENDER_INTERNAL_DATABASE_URL exists': bool(os.getenv("RENDER_INTERNAL_DATABASE_URL")),
+        'RENDER_INTERNAL_DATABASE_URL exists': bool(internal_database_url),
         'RENDER_EXTERNAL_HOSTNAME': os.getenv('RENDER_EXTERNAL_HOSTNAME'),
         'RENDER_SERVICE_NAME': os.getenv('RENDER_SERVICE_NAME'),
         'RENDER_SERVICE_TYPE': os.getenv('RENDER_SERVICE_TYPE')
@@ -111,7 +110,7 @@ def get_database_url():
     logger.info(f"Environment configuration: {env_vars}")
     
     if internal_database_url:
-        logger.info("Using internal database URL for Render.com")
+        logger.info("Using RENDER_INTERNAL_DATABASE_URL for Render.com internal networking")
         database_url = internal_database_url
     elif database_url:
         logger.info("Using external DATABASE_URL")
