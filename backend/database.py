@@ -131,7 +131,12 @@ def get_database_url():
 
 def create_db_engine(max_retries=5, retry_interval=5):
     """Create database engine with retry logic"""
-    database_url = os.getenv("DATABASE_URL")
+    # Use external database URL for connecting from outside Render's network
+    database_url = os.getenv(
+        "DATABASE_URL", 
+        "postgresql://hoteltracker_user:VoKj4Xa7xyG0DhH2Fa0UW48QFd7gGZme@dpg-cu7failds78s73arp6j0-a.oregon-postgres.render.com/hoteltracker"
+    )
+    
     if not database_url:
         raise ValueError("DATABASE_URL environment variable is not set")
     
@@ -203,6 +208,10 @@ def create_db_engine(max_retries=5, retry_interval=5):
             logger.error("Database does not exist. Please check:")
             logger.error("1. The database name is correct")
             logger.error("2. The database has been created")
+        elif "SSL SYSCALL error" in error_msg:
+            logger.error("SSL connection error. Please check:")
+            logger.error("1. SSL is properly configured")
+            logger.error("2. The connection is not being blocked by a firewall")
         
         raise
 

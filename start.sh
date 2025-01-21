@@ -6,8 +6,9 @@ echo "Starting application initialization..."
 # Function to parse DATABASE_URL
 parse_db_url() {
     if [ -z "$DATABASE_URL" ]; then
-        echo "ERROR: DATABASE_URL is not set"
-        exit 1
+        # Use default external URL if not set
+        DATABASE_URL="postgresql://hoteltracker_user:VoKj4Xa7xyG0DhH2Fa0UW48QFd7gGZme@dpg-cu7failds78s73arp6j0-a.oregon-postgres.render.com/hoteltracker"
+        echo "Using default external DATABASE_URL"
     fi
     
     echo "Parsing DATABASE_URL..."
@@ -20,7 +21,7 @@ parse_db_url() {
         DB_NAME="${BASH_REMATCH[4]}"
         DB_PORT=5432
         
-        export DB_USER DB_HOST DB_NAME DB_PORT
+        export DB_USER DB_HOST DB_NAME DB_PORT DB_PASSWORD
         
         echo "Successfully parsed database connection info:"
         echo "User: $DB_USER"
@@ -50,20 +51,20 @@ test_postgres_connection() {
         return 1
     fi
     
-    # Test PostgreSQL connection
-    echo "Testing PostgreSQL connection..."
-    if PGPASSWORD="$DB_PASSWORD" psql "postgresql://$DB_USER@$DB_HOST:$DB_PORT/$DB_NAME" -c "SELECT version();" >/dev/null 2>&1; then
-        echo "PostgreSQL connection successful"
+    # Test PostgreSQL connection with SSL
+    echo "Testing PostgreSQL connection with SSL..."
+    if PGPASSWORD="$DB_PASSWORD" psql "postgresql://$DB_USER@$DB_HOST:$DB_PORT/$DB_NAME?sslmode=require" -c "SELECT version();" >/dev/null 2>&1; then
+        echo "PostgreSQL SSL connection successful"
         return 0
     else
-        echo "PostgreSQL connection failed"
+        echo "PostgreSQL SSL connection failed"
         return 1
     fi
 }
 
 # Function to check basic connectivity
 check_postgres() {
-    if PGPASSWORD="$DB_PASSWORD" psql "postgresql://$DB_USER@$DB_HOST:$DB_PORT/$DB_NAME" -c '\q' >/dev/null 2>&1; then
+    if PGPASSWORD="$DB_PASSWORD" psql "postgresql://$DB_USER@$DB_HOST:$DB_PORT/$DB_NAME?sslmode=require" -c '\q' >/dev/null 2>&1; then
         return 0
     fi
     return 1
