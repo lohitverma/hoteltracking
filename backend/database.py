@@ -178,6 +178,7 @@ def create_db_engine(max_retries=5, retry_interval=5):
                     logger.info(f"Attempting database connection to: {url_parts[1]}")
             
             with tracer.trace('database.engine_initialization'):
+                # Create the engine with specific configuration for Render.com
                 engine = create_engine(
                     database_url,
                     pool_size=5,
@@ -186,24 +187,65 @@ def create_db_engine(max_retries=5, retry_interval=5):
                     pool_pre_ping=True,
                     pool_recycle=300,
                     connect_args={
-                        'connect_timeout': 10,
+                        'connect_timeout': 30,  # Increased timeout
                         'options': '-c statement_timeout=30000',
-                        'sslmode': 'require'  # Enable SSL for Render.com
+                        'sslmode': 'require',
+                        'application_name': 'hoteltracker',
+                        'keepalives': 1,
+                        'keepalives_idle': 30,
+                        'keepalives_interval': 10,
+                        'keepalives_count': 5
                     }
                 )
             
-            # Verify connection
+            # Verify connection with detailed error handling
             with tracer.trace('database.connection_verification'):
-                with engine.connect() as connection:
-                    connection.execute("SELECT 1")
-                    logger.info("Database connection successful!")
-                    statsd.increment('database.connection.success')
-                    return engine
+                try:
+                    with engine.connect() as connection:
+                        # Test basic connectivity
+                        connection.execute("SELECT 1")
+                        logger.info("Basic connectivity test passed")
+                        
+                        # Test database permissions
+                        connection.execute("SELECT current_user, current_database()")
+                        logger.info("Permission test passed")
+                        
+                        # Get PostgreSQL version
+                        result = connection.execute("SHOW server_version").scalar()
+                        logger.info(f"Connected to PostgreSQL version: {result}")
+                        
+                        # Get current database name
+                        result = connection.execute("SELECT current_database()").scalar()
+                        logger.info(f"Connected to database: {result}")
+                        
+                        # Get SSL status
+                        result = connection.execute("SHOW ssl").scalar()
+                        logger.info(f"SSL status: {result}")
+                        
+                        statsd.increment('database.connection.success')
+                        return engine
+                except Exception as e:
+                    logger.error(f"Detailed connection test failed: {str(e)}")
+                    raise
                 
         except exc.OperationalError as e:
             last_exception = e
             retry_count += 1
             statsd.increment('database.connection.retry')
+            
+            # Log detailed error information
+            error_msg = str(e)
+            if "could not connect to server" in error_msg:
+                logger.error("Network connectivity issue detected")
+            elif "password authentication failed" in error_msg:
+                logger.error("Authentication failed - check credentials")
+            elif "database" in error_msg and "does not exist" in error_msg:
+                logger.error("Database does not exist")
+            elif "SSL SYSCALL error" in error_msg:
+                logger.error("SSL connection issue detected")
+            else:
+                logger.error(f"Database connection error: {error_msg}")
+            
             if retry_count < max_retries:
                 logger.warning(f"Database connection attempt {retry_count} failed: {str(e)}")
                 logger.info(f"Retrying in {retry_interval} seconds...")

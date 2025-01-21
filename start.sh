@@ -48,14 +48,38 @@ echo "External Key Present: $([ ! -z "$RENDER_EXTERNAL_DB_KEY" ] && echo "Yes" |
 
 # Function to check if we can connect to PostgreSQL server
 check_postgres() {
-    PGPASSWORD=$DB_PASSWORD psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "postgres" -c '\q' "sslmode=require" 2>/dev/null
-    return $?
+    # Try basic connection
+    if PGPASSWORD=$DB_PASSWORD psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "postgres" -c '\q' "sslmode=require" 2>/dev/null; then
+        echo "Basic connection successful"
+        return 0
+    fi
+    return 1
 }
 
-# Function to check if database exists
+# Function to check database exists
 database_exists() {
-    PGPASSWORD=$DB_PASSWORD psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -lqt "sslmode=require" | cut -d \| -f 1 | grep -qw "$DB_NAME"
-    return $?
+    if PGPASSWORD=$DB_PASSWORD psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -c '\q' "sslmode=require" 2>/dev/null; then
+        echo "Database exists and is accessible"
+        return 0
+    fi
+    return 1
+}
+
+# Function to run detailed database checks
+check_database_details() {
+    echo "Running detailed database checks..."
+    
+    # Check SSL
+    echo "Checking SSL connection..."
+    PGPASSWORD=$DB_PASSWORD psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -c "SHOW ssl;" "sslmode=require" || echo "SSL check failed"
+    
+    # Check version
+    echo "Checking PostgreSQL version..."
+    PGPASSWORD=$DB_PASSWORD psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -c "SHOW server_version;" "sslmode=require" || echo "Version check failed"
+    
+    # Check user permissions
+    echo "Checking user permissions..."
+    PGPASSWORD=$DB_PASSWORD psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -c "SELECT current_user, current_database();" "sslmode=require" || echo "Permission check failed"
 }
 
 # Wait for PostgreSQL server to be ready
@@ -65,16 +89,27 @@ RETRY_COUNT=0
 
 echo "Testing network connectivity..."
 if command -v nc &> /dev/null; then
+    echo "Testing with nc..."
     nc -zv "$DB_HOST" "$DB_PORT" 2>&1 || echo "nc command failed"
 fi
 
 if command -v ping &> /dev/null; then
+    echo "Testing with ping..."
     ping -c 1 "$DB_HOST" || echo "ping command failed"
 fi
 
 if command -v dig &> /dev/null; then
+    echo "Testing with dig..."
     dig "$DB_HOST" || echo "dig command failed"
 fi
+
+if command -v nslookup &> /dev/null; then
+    echo "Testing with nslookup..."
+    nslookup "$DB_HOST" || echo "nslookup command failed"
+fi
+
+echo "Testing TCP connection..."
+timeout 5 bash -c "</dev/tcp/$DB_HOST/$DB_PORT" 2>/dev/null && echo "TCP connection successful" || echo "TCP connection failed"
 
 echo "Network test complete."
 
@@ -95,10 +130,16 @@ done
 
 echo "PostgreSQL server is ready!"
 
+# Run detailed database checks
+check_database_details
+
 # Create database if it doesn't exist
 if ! database_exists; then
     echo "Database $DB_NAME does not exist. Creating..."
-    PGPASSWORD=$DB_PASSWORD createdb -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" "$DB_NAME"
+    PGPASSWORD=$DB_PASSWORD createdb -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" "$DB_NAME" || {
+        echo "Failed to create database"
+        exit 1
+    }
     echo "Database $DB_NAME created successfully!"
 else
     echo "Database $DB_NAME already exists."
