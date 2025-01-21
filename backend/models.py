@@ -1,8 +1,7 @@
 from sqlalchemy import Boolean, Column, ForeignKey, Integer, String, Float, DateTime, JSON
 from sqlalchemy.orm import relationship
 from datetime import datetime
-
-from database import Base
+from .database import Base
 
 class Hotel(Base):
     __tablename__ = "hotels"
@@ -67,3 +66,32 @@ class CacheEntry(Base):
     
     def __repr__(self):
         return f"<CacheEntry {self.key}>"
+
+class Analytics(Base):
+    __tablename__ = "analytics"
+
+    id = Column(Integer, primary_key=True, index=True)
+    event_type = Column(String, index=True)
+    event_data = Column(JSON)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    timestamp = Column(DateTime, default=datetime.utcnow)
+    source = Column(String, index=True)
+    session_id = Column(String, index=True)
+    ip_address = Column(String)
+    user_agent = Column(String)
+    path = Column(String)
+    status_code = Column(Integer)
+    response_time = Column(Float)
+    
+    user = relationship("User", back_populates="analytics")
+
+# Update User model to include analytics relationship
+class User(Base):
+    __tablename__ = "users"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    
+    analytics = relationship("Analytics", back_populates="user")
+
+    def __repr__(self):
+        return f"<User {self.id}>"

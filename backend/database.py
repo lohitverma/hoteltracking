@@ -21,6 +21,9 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Create Base class for models
+Base = declarative_base()
+
 def run_psql_check(host, port, user, dbname):
     """Run psql command to check database connection"""
     try:
@@ -223,7 +226,6 @@ def create_db_engine(max_retries=5, retry_interval=5):
 try:
     engine = create_db_engine()
     SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-    Base = declarative_base()
 except Exception as e:
     logger.error(f"Database initialization failed: {str(e)}")
     raise
